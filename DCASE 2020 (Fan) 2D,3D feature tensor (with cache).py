@@ -81,9 +81,9 @@ class Conv2DAutoencoder(nn.Module):
 # ==========================================
 # 3. Per-Machine-ID Training & Evaluation Loop
 # ==========================================
-base_dir = r"D:\MIMII Dataset\PSoC6_Fan_Project"
-train_dir = os.path.join(base_dir, "Train_Normal")
-test_dir = os.path.join(base_dir, "Test_Validation")
+base_dir = r"/Volumes/One Touch/MIMII Dataset/PSoC6_Fan_Project"
+train_dir = os.path.join(base_dir, "Train_Normal_00")
+test_dir = os.path.join(base_dir, "Test_Validation_00")
 cache_dir = os.path.join(base_dir, "cache_2d")
 os.makedirs(cache_dir, exist_ok=True)
 
