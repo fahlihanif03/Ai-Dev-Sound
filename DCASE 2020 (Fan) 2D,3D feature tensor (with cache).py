@@ -4,29 +4,38 @@ import numpy as np
 import librosa
 import torch
 import torch.nn as nn
-from torch.utils.data import DataLoader, TensorDataset
+from torch.utils.data import DataLoader, TensorDataset, random_split
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import roc_auc_score
 from joblib import Parallel, delayed
 
 # ==========================================
+# 0. Configuration
+# ==========================================
+N_MELS = 128
+FRAMES = 64          # widened from 10 -> 64 (~2.05s context at hop=512/sr=16000, vs ~0.32s before)
+WINDOW_STRIDE = 8    # step between windows; keeps dataset size/RAM bounded now that FRAMES is 6.4x wider
+VAL_SPLIT = 0.1       # fraction of training windows held out for validation
+EARLY_STOP_PATIENCE = 5  # stop if val loss hasn't improved in this many epochs
+
+# ==========================================
 # 1. Feature Extraction (2D Log-Mel Tensors)
 # ==========================================
-def extract_features(file_path, n_mels=128, frames=10, n_fft=1024, hop_length=512):
+def extract_features(file_path, n_mels=N_MELS, frames=FRAMES, n_fft=1024, hop_length=512, stride=WINDOW_STRIDE):
     """Loads 16kHz audio and computes 2D Log-Mel tensor windows (1, n_mels, frames)."""
     y, sr = librosa.load(file_path, sr=16000)
-    
+
     mel_spec = librosa.feature.melspectrogram(
         y=y, sr=sr, n_fft=n_fft, hop_length=hop_length, n_mels=n_mels
     )
     log_mel = librosa.power_to_db(mel_spec, ref=np.max)
-    
+
     vectors = []
-    for t in range(log_mel.shape[1] - frames + 1):
+    for t in range(0, log_mel.shape[1] - frames + 1, stride):
         # Format as 2D spatial patch with 1 channel: Shape (1, n_mels, frames)
         patch = log_mel[:, t : t + frames][np.newaxis, :, :]
         vectors.append(patch)
-        
+
     return np.array(vectors, dtype=np.float32)
 
 def load_or_extract_features(file_list, cache_filename):
@@ -81,14 +90,18 @@ class Conv2DAutoencoder(nn.Module):
 # ==========================================
 # 3. Per-Machine-ID Training & Evaluation Loop
 # ==========================================
-base_dir = r"/Volumes/One Touch/MIMII Dataset/PSoC6_Fan_Project"
-train_dir = os.path.join(base_dir, "Train_Normal_00")
-test_dir = os.path.join(base_dir, "Test_Validation_00")
+base_dir = r"/Volumes/One Touch/MIMII Dataset/DCASE2020/fan"
+train_dir = os.path.join(base_dir, "train")
+test_dir = os.path.join(base_dir, "test")
 cache_dir = os.path.join(base_dir, "cache_2d")
 os.makedirs(cache_dir, exist_ok=True)
 
-device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
-machine_ids = ["id_00"]
+device = torch.device(
+    "cuda" if torch.cuda.is_available()
+    else "mps" if torch.backends.mps.is_available()
+    else "cpu"
+)
+machine_ids = ["id_00", "id_02", "id_04", "id_06"]
 
 auc_list = []
 pauc_list = []
@@ -107,30 +120,52 @@ for machine_id in machine_ids:
         print(f"Warning: No training files found for {machine_id} in {train_dir}")
         continue
 
-    cache_path = os.path.join(cache_dir, f"X_train_2d_{machine_id}.npy")
+    cache_path = os.path.join(cache_dir, f"X_train_2d_{machine_id}_f{FRAMES}_s{WINDOW_STRIDE}.npy")
     X_train = load_or_extract_features(train_files, cache_path)
-    
-    # Flatten 2D shapes (N, 1, 128, 10) to scale and reshape back
+
+    # Flatten 2D shapes (N, 1, 128, FRAMES) to scale and reshape back
     N, C, H, W = X_train.shape
     scaler = StandardScaler()
     X_train_scaled = scaler.fit_transform(X_train.reshape(N, -1)).reshape(N, C, H, W)
-    
+
     train_tensor = torch.tensor(X_train_scaled, dtype=torch.float32)
+    full_dataset = TensorDataset(train_tensor, train_tensor)
+
+    val_size = int(len(full_dataset) * VAL_SPLIT)
+    train_size = len(full_dataset) - val_size
+    train_subset, val_subset = random_split(
+        full_dataset, [train_size, val_size],
+        generator=torch.Generator().manual_seed(42)
+    )
+
     train_loader = DataLoader(
-        TensorDataset(train_tensor, train_tensor), 
-        batch_size=512, 
-        shuffle=True, 
+        train_subset,
+        batch_size=512,
+        shuffle=True,
         pin_memory=(device.type == "cuda")
     )
-    
+    val_loader = DataLoader(
+        val_subset,
+        batch_size=512,
+        shuffle=False,
+        pin_memory=(device.type == "cuda")
+    )
+    print(f"Train windows: {train_size} | Val windows: {val_size}")
+
     # 2. Train dedicated 2D Autoencoder
     model = Conv2DAutoencoder().to(device)
     optimizer = torch.optim.Adam(model.parameters(), lr=1e-3)
     criterion = nn.MSELoss()
-    
-    model.train()
+
     epochs = 40
+    best_val_loss = float("inf")
+    epochs_without_improvement = 0
+    best_state = None
+
     for epoch in range(epochs):
+        model.train()
+        train_loss_sum = 0.0
+        train_count = 0
         for batch_x, _ in train_loader:
             batch_x = batch_x.to(device, non_blocking=True)
             optimizer.zero_grad()
@@ -138,7 +173,37 @@ for machine_id in machine_ids:
             loss = criterion(reconstruction, batch_x)
             loss.backward()
             optimizer.step()
-            
+            train_loss_sum += loss.item() * batch_x.size(0)
+            train_count += batch_x.size(0)
+        train_loss = train_loss_sum / train_count
+
+        model.eval()
+        val_loss_sum = 0.0
+        val_count = 0
+        with torch.no_grad():
+            for batch_x, _ in val_loader:
+                batch_x = batch_x.to(device, non_blocking=True)
+                reconstruction = model(batch_x)
+                loss = criterion(reconstruction, batch_x)
+                val_loss_sum += loss.item() * batch_x.size(0)
+                val_count += batch_x.size(0)
+        val_loss = val_loss_sum / val_count
+
+        print(f"  Epoch {epoch + 1:>2}/{epochs} | train_loss: {train_loss:.5f} | val_loss: {val_loss:.5f}")
+
+        if val_loss < best_val_loss:
+            best_val_loss = val_loss
+            epochs_without_improvement = 0
+            best_state = {k: v.detach().clone() for k, v in model.state_dict().items()}
+        else:
+            epochs_without_improvement += 1
+            if epochs_without_improvement >= EARLY_STOP_PATIENCE:
+                print(f"  Early stopping at epoch {epoch + 1} (no val improvement in {EARLY_STOP_PATIENCE} epochs)")
+                break
+
+    if best_state is not None:
+        model.load_state_dict(best_state)
+
     # 3. Test on specific Machine ID test set
     model.eval()
     test_files = glob.glob(os.path.join(test_dir, f"*{machine_id}_*.wav"))

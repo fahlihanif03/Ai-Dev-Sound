@@ -33,24 +33,23 @@ import numpy as np
 import sounddevice as sd
 from tensorflow import keras
 
-from prepare_features import audio_to_log_mel, frames_to_vectors, SAMPLE_RATE
+from prepare_features import audio_to_log_mel, frames_to_vectors, SAMPLE_RATE, WINDOW_SECONDS
+from scoring import score_vectors
+from mic_utils import require_input_device
 
 MODEL_DIR = "models"
-WINDOW_SECONDS = 2.0
 
 
-def score_window(y, model, mean, std):
+def score_window(y, model, mean, std, err_std):
     log_mel = audio_to_log_mel(y)
     vectors = frames_to_vectors(log_mel)
     if vectors.shape[0] == 0:
         return None
     vectors_norm = (vectors - mean) / std
-    pred = model.predict(vectors_norm, verbose=0)
-    frame_errors = np.mean(np.square(vectors_norm - pred), axis=1)
-    return float(np.mean(frame_errors))
+    return score_vectors(vectors_norm, model, err_std)
 
 
-def record_scores(label, seconds, model, mean, std, device):
+def record_scores(label, seconds, model, mean, std, err_std, device):
     print(f"\nAbout to record {seconds}s of KNOWN-{label.upper()} sound.")
     if label == "normal":
         print("Make sure the machine is actually running normally right now.")
@@ -67,7 +66,7 @@ def record_scores(label, seconds, model, mean, std, device):
         recording = sd.rec(window_samples, samplerate=SAMPLE_RATE, channels=1,
                             dtype="float32", device=device)
         sd.wait()
-        score = score_window(recording[:, 0], model, mean, std)
+        score = score_window(recording[:, 0], model, mean, std, err_std)
         if score is None:
             continue
         scores.append(score)
@@ -109,17 +108,25 @@ def main():
     if not os.path.exists(model_path):
         raise SystemExit(f"No trained model found at {model_path} - run train_autoencoder.py first.")
 
+    require_input_device(args.device)
+
     model = keras.models.load_model(model_path)
     stats = np.load(stats_path)
     mean, std = stats["mean"], stats["std"]
+    if "err_std" not in stats:
+        raise SystemExit(
+            f"{stats_path} is from an old training run - re-run train_autoencoder.py "
+            f"--machine_id {args.machine_id} to regenerate it."
+        )
+    err_std = stats["err_std"]
     old_threshold = float(stats["threshold"])
 
-    normal_scores = record_scores("normal", args.seconds, model, mean, std, args.device)
+    normal_scores = record_scores("normal", args.seconds, model, mean, std, err_std, args.device)
     if normal_scores.size == 0:
         raise SystemExit("No usable normal audio captured - check your microphone/device selection.")
 
     if args.with_defect:
-        abnormal_scores = record_scores("defect", args.seconds, model, mean, std, args.device)
+        abnormal_scores = record_scores("defect", args.seconds, model, mean, std, err_std, args.device)
         if abnormal_scores.size == 0:
             raise SystemExit("No usable defect audio captured - check your microphone/device selection.")
 
@@ -136,7 +143,7 @@ def main():
     print(f"Old threshold: {old_threshold:.4f}")
     print(f"New threshold: {new_threshold:.4f}")
 
-    np.savez(stats_path, mean=mean, std=std, threshold=new_threshold)
+    np.savez(stats_path, mean=mean, std=std, threshold=new_threshold, err_mean=stats["err_mean"], err_std=err_std)
     print("\nSaved. live_monitor.py and other scripts will use the new threshold automatically.")
 
 

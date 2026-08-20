@@ -27,10 +27,11 @@ import numpy as np
 import sounddevice as sd
 from tensorflow import keras
 
-from prepare_features import audio_to_log_mel, frames_to_vectors, SAMPLE_RATE
+from prepare_features import audio_to_log_mel, frames_to_vectors, SAMPLE_RATE, WINDOW_SECONDS
+from scoring import score_vectors
+from mic_utils import require_input_device
 
 MODEL_DIR = "models"
-WINDOW_SECONDS = 2.0
 
 
 def load_model_and_stats(machine_id):
@@ -40,18 +41,21 @@ def load_model_and_stats(machine_id):
         raise SystemExit(f"No trained model found at {model_path} - run train_autoencoder.py first.")
     model = keras.models.load_model(model_path)
     stats = np.load(stats_path)
-    return model, stats["mean"], stats["std"], float(stats["threshold"])
+    if "err_std" not in stats:
+        raise SystemExit(
+            f"{stats_path} is from an old training run (before per-dimension error scoring "
+            f"was added) - re-run train_autoencoder.py --machine_id {machine_id} to regenerate it."
+        )
+    return model, stats["mean"], stats["std"], stats["err_std"], float(stats["threshold"])
 
 
-def score_audio(y, model, mean, std):
+def score_audio(y, model, mean, std, err_std):
     log_mel = audio_to_log_mel(y)
     vectors = frames_to_vectors(log_mel)
     if vectors.shape[0] == 0:
         return None
     vectors_norm = (vectors - mean) / std
-    pred = model.predict(vectors_norm, verbose=0)
-    frame_errors = np.mean(np.square(vectors_norm - pred), axis=1)
-    return float(np.mean(frame_errors))
+    return score_vectors(vectors_norm, model, err_std)
 
 
 def main():
@@ -61,7 +65,9 @@ def main():
                          help="Input device index - run `python -m sounddevice` to list options")
     args = parser.parse_args()
 
-    model, mean, std, threshold = load_model_and_stats(args.machine_id)
+    require_input_device(args.device)
+
+    model, mean, std, err_std, threshold = load_model_and_stats(args.machine_id)
     print(f"Loaded model for {args.machine_id}, anomaly threshold = {threshold:.4f}")
     print("Listening... Ctrl+C to stop.\n")
 
@@ -78,7 +84,7 @@ def main():
             sd.wait()
             y = recording[:, 0]
 
-            score = score_audio(y, model, mean, std)
+            score = score_audio(y, model, mean, std, err_std)
             if score is None:
                 print("(clip too quiet/short to score)")
                 continue
