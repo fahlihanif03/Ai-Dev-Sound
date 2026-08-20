@@ -31,7 +31,7 @@ import librosa
 from tqdm import tqdm
 
 # ---- config ----
-DATASET_DIR = "/Users/monmon/Desktop/Ai Dev/Sound/fan6db"  # your extracted fan data
+DATASET_DIR = r"C:\Users\USER\Ai-Dev-Sound-Windows\fan6db"  # your extracted fan data
 SAMPLE_RATE = 16000                # matches the board's mic sample rate
 N_MELS = 64
 N_FFT = 1024
@@ -95,23 +95,35 @@ def find_machine_folders(dataset_dir):
     sibling 'abnormal' folder, and infer the machine id from the parent
     folder name. Handles both flat (fan6db/id_00/normal) and nested
     (fan6db/fan/id_00/normal) extraction layouts without guessing which
-    one you got."""
+    one you got.
+
+    Also handles the flat Train_Normal_XX / Test_Validation_XX layout (no
+    normal/abnormal subfolders - class is encoded in the filename prefix
+    instead, and Test_Validation_XX mixes normal_*/anomaly_* together)."""
     found = {}
     for normal_dir in glob.glob(os.path.join(dataset_dir, "**", "normal"), recursive=True):
         parent = os.path.dirname(normal_dir)
         abnormal_dir = os.path.join(parent, "abnormal")
         if os.path.isdir(abnormal_dir):
             machine_id = os.path.basename(parent)
-            found[machine_id] = (normal_dir, abnormal_dir)
+            found[machine_id] = (normal_dir, None, abnormal_dir, None)
+
+    for train_dir in glob.glob(os.path.join(dataset_dir, "Train_Normal_*")):
+        suffix = os.path.basename(train_dir)[len("Train_Normal_"):]
+        test_dir = os.path.join(dataset_dir, f"Test_Validation_{suffix}")
+        if os.path.isdir(test_dir):
+            found[f"id_{suffix}"] = (train_dir, "normal_", test_dir, "anomaly_")
+
     return found
 
 
-def process_folder(folder, label):
+def process_folder(folder, label, prefix=None):
     """Returns (vectors, lengths): the concatenated frame vectors for every
     file, plus how many vectors came from each file (in the same order) -
     so downstream code can regroup vectors back into per-file or
     per-window pools without re-touching audio."""
-    wav_paths = sorted(glob.glob(os.path.join(folder, "*.wav")))
+    pattern = f"{prefix}*.wav" if prefix else "*.wav"
+    wav_paths = sorted(glob.glob(os.path.join(folder, pattern)))
     all_vectors = []
     lengths = []
     for path in tqdm(wav_paths, desc=f"{label}: {folder}"):
@@ -140,9 +152,9 @@ def main():
             f"Run: find \"{DATASET_DIR}\" -maxdepth 4 -type d   to see what's actually in there."
         )
 
-    for machine_id, (normal_dir, abnormal_dir) in sorted(machine_folders.items()):
-        normal_vectors, normal_lengths = process_folder(normal_dir, "normal")
-        abnormal_vectors, abnormal_lengths = process_folder(abnormal_dir, "abnormal")
+    for machine_id, (normal_dir, normal_prefix, abnormal_dir, abnormal_prefix) in sorted(machine_folders.items()):
+        normal_vectors, normal_lengths = process_folder(normal_dir, "normal", normal_prefix)
+        abnormal_vectors, abnormal_lengths = process_folder(abnormal_dir, "abnormal", abnormal_prefix)
 
         np.save(os.path.join(OUTPUT_DIR, f"{machine_id}_normal.npy"), normal_vectors)
         np.save(os.path.join(OUTPUT_DIR, f"{machine_id}_normal_lengths.npy"), normal_lengths)

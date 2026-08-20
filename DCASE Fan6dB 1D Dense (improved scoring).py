@@ -75,7 +75,7 @@ class DeepAutoencoder(nn.Module):
 # ==========================================
 # 3. Per-Machine-ID Training & Evaluation Loop
 # ==========================================
-base_dir = "/Users/monmon/Desktop/Ai Dev/Sound/fan6db"
+base_dir = r"C:\Users\USER\Ai-Dev-Sound-Windows\fan6db"
 cache_dir = os.path.join(base_dir, "cache_1d_improved")
 os.makedirs(cache_dir, exist_ok=True)
 
@@ -97,8 +97,14 @@ for machine_id in machine_ids:
     print(f" Processing Fan Machine: {machine_id}")
     print(f"----------------------------------------")
 
+    # fan6db layout on this machine is flat Train_Normal_XX / Test_Validation_XX
+    # folders (prefix-filtered by class) rather than id_XX/normal/abnormal.
+    suffix = machine_id.replace("id_", "")
     normal_files = sorted(glob.glob(os.path.join(base_dir, machine_id, "normal", "*.wav")))
     abnormal_files = sorted(glob.glob(os.path.join(base_dir, machine_id, "abnormal", "*.wav")))
+    if len(normal_files) == 0:
+        normal_files = sorted(glob.glob(os.path.join(base_dir, f"Train_Normal_{suffix}", "normal_*.wav")))
+        abnormal_files = sorted(glob.glob(os.path.join(base_dir, f"Test_Validation_{suffix}", "anomaly_*.wav")))
     if len(normal_files) == 0:
         print(f"Warning: No normal files found for {machine_id}")
         continue

@@ -6,6 +6,8 @@ env/
 # Datasets and extracted features
 fan6db/
 features/
+features_deepcraft/
+models_deepcraft/
 
 # Python cache & compiled files
 __pycache__/
@@ -13,6 +15,12 @@ __pycache__/
 *.pyo
 *.pyd
 
+# Temporary folders and log files
+Ai-Dev-Sound-Windows/
+"Ai Dev Sound/"
+*.log
+
 # Operating system files
 .DS_Store
 Thumbs.db
+
