@@ -1,0 +1,10 @@
+tensorflow
+tf-keras
+librosa==0.10.1
+numpy<2.0
+soundfile
+tqdm
+scikit-learn
+sounddevice
+matplotlib
+tensorflow_hub
