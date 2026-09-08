@@ -31,7 +31,7 @@ import librosa
 from tqdm import tqdm
 
 # ---- config ----
-DATASET_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)), "fan6db")  # your extracted fan data
+DATASET_DIR = r"C:\Users\anepf\Ai-Dev-Sound\sound_database"  # your extracted fan data
 SAMPLE_RATE = 16000                # matches the board's mic sample rate
 N_MELS = 64
 N_FFT = 1024

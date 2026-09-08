@@ -75,7 +75,7 @@ class DeepAutoencoder(nn.Module):
 # ==========================================
 # 3. Per-Machine-ID Training & Evaluation Loop
 # ==========================================
-base_dir = r"C:\Users\USER\Ai-Dev-Sound-Windows\fan6db"
+base_dir = r"C:\Users\anepf\Ai-Dev-Sound\sound_database"
 cache_dir = os.path.join(base_dir, "cache_1d_improved")
 os.makedirs(cache_dir, exist_ok=True)
 

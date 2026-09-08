@@ -1,0 +1,67 @@
+/* Dark theme - near-black surfaces, vivid orange accent, subtle glow
+   vignette, matching the VEID-style reference. */
+:root {
+  --bg: #0c0d0f;
+  --bg-glow: radial-gradient(circle at 18% 8%, rgba(255, 106, 26, 0.16), transparent 42%),
+    radial-gradient(circle at 88% 92%, rgba(255, 106, 26, 0.1), transparent 46%);
+  --surface: #18191c;
+  --surface-tint: #1f2023;
+  --surface-2: #222327;
+  --border-soft: rgba(255, 255, 255, 0.08);
+  --border-soft-2: rgba(255, 255, 255, 0.14);
+  --text: #f4f4f5;
+  --text-muted: #8b8d93;
+  --text-faint: #5c5e64;
+  --accent: #ff6a1a;
+  --accent-2: #ffb03a;
+  --accent-soft: rgba(255, 106, 26, 0.16);
+  --accent-grad: linear-gradient(90deg, #ff6a1a, #ffb03a);
+  --amber: #f0b429;
+  --amber-soft: rgba(240, 180, 41, 0.15);
+  --red: #ff5a4d;
+  --red-soft: rgba(255, 90, 77, 0.15);
+  --green: #37c26a;
+  --green-soft: rgba(55, 194, 106, 0.15);
+  --stage: #0c0d0f;
+  --stage-2: #1a1b1e;
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 16px 36px rgba(0, 0, 0, 0.45);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.04) inset, 0 4px 14px rgba(0, 0, 0, 0.35);
+  --radius-xl: 24px;
+  --radius-lg: 18px;
+  --radius-md: 12px;
+  --radius-pill: 999px;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#app {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--bg-glow), var(--bg);
+  color: var(--text);
+  font-family: "Inter", "Segoe UI", system-ui, -apple-system, sans-serif;
+  -webkit-font-smoothing: antialiased;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin: 0;
+}
+
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font-family: inherit;
+}

@@ -5,6 +5,7 @@ env/
 
 # Datasets and extracted features
 fan6db/
+sound_database/
 features/
 features_deepcraft/
 models_deepcraft/
