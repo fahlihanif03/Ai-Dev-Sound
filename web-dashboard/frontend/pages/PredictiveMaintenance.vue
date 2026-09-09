@@ -24,17 +24,31 @@ const tempOn = ref(true);
 const audioEffective = computed(() => boardOn.value && audioOn.value);
 const tempEffective = computed(() => boardOn.value && tempOn.value);
 
+// A channel that's gone offline keeps whatever flag/value it last had
+// before going quiet (see dashboard-do.ts's announceOffline()) - that's
+// stale, not a live problem, so it's excluded from the abnormal/alert
+// checks below rather than double-counted as both offline and attention.
+const soundOffline = computed(() => audioEffective.value && sound.value.offline);
+const tempOffline = computed(() => tempEffective.value && temperature.value.offline);
+const anyOffline = computed(() => soundOffline.value || tempOffline.value);
+
 const overallOk = computed(() => {
   if (!boardOn.value) return true;
-  const soundBad = audioEffective.value && sound.value.flag === "abnormal";
-  const tempBad = tempEffective.value && temperature.value.flag === "abnormal";
+  const soundBad = audioEffective.value && !sound.value.offline && sound.value.flag === "abnormal";
+  const tempBad = tempEffective.value && !temperature.value.offline && temperature.value.flag === "abnormal";
   return !soundBad && !tempBad;
+});
+
+const topStatus = computed(() => {
+  if (!boardOn.value) return "Board off";
+  if (anyOffline.value) return "Offline";
+  return overallOk.value ? "Normal" : "Attention";
 });
 
 const alertMessage = computed(() => {
   const bad = [];
-  if (audioEffective.value && sound.value.flag === "abnormal") bad.push("sound");
-  if (tempEffective.value && temperature.value.flag === "abnormal") bad.push("temperature");
+  if (audioEffective.value && !sound.value.offline && sound.value.flag === "abnormal") bad.push("sound");
+  if (tempEffective.value && !temperature.value.offline && temperature.value.flag === "abnormal") bad.push("temperature");
   if (bad.length === 0) return "";
   return `${bad.join(" and ")} reading${bad.length > 1 ? "s are" : " is"} outside the normal range.`;
 });
@@ -44,6 +58,12 @@ const lastUpdate = computed(() =>
 );
 
 const tempSeries = computed(() => temperature.value.history);
+
+/* Readings arrive with whatever precision the board/simulator happened to
+ * compute (e.g. 70.7417) - always display exactly 2 decimal places. */
+function fmt(v) {
+  return typeof v === "number" ? v.toFixed(2) : "--";
+}
 
 const pulse = ref(false);
 const showReadout = ref(false);
@@ -63,7 +83,7 @@ function onCaseSelect() {
     <div class="topbar">
       <div class="topbar-left">
         <span class="eyebrow">Predictive Maintenance</span>
-        <span class="status-pill" :class="{ warn: !overallOk }">{{ !boardOn ? "Board off" : overallOk ? "Normal" : "Attention" }}</span>
+        <span class="status-pill" :class="{ warn: boardOn && !anyOffline && !overallOk, offline: boardOn && anyOffline }">{{ topStatus }}</span>
       </div>
       <PowerToggle v-model="boardOn" on-label="Board on" off-label="Board off" />
     </div>
@@ -76,14 +96,14 @@ function onCaseSelect() {
           <div class="signal-head">
             <h2 class="card-title">Sound</h2>
             <div class="head-right">
-              <StatusBadge v-if="audioEffective" :flag="sound.flag" :value="sound.value" unit="" :threshold="sound.threshold" />
+              <StatusBadge v-if="audioEffective" :flag="sound.flag" :value="sound.value" unit="" :threshold="sound.threshold" :offline="sound.offline" />
               <PowerToggle v-model="audioOn" size="sm" :disabled="!boardOn" on-label="On" off-label="Off" />
             </div>
           </div>
 
           <template v-if="audioEffective">
             <div class="signal-value-row">
-              <span class="signal-value">{{ sound.value ?? "--" }}</span>
+              <span class="signal-value">{{ fmt(sound.value) }}</span>
               <span class="signal-unit">anomaly score</span>
             </div>
             <div class="chart-row">
@@ -104,14 +124,14 @@ function onCaseSelect() {
           <div class="signal-head">
             <h2 class="card-title">Temperature</h2>
             <div class="head-right">
-              <StatusBadge v-if="tempEffective" :flag="temperature.flag" :value="temperature.value" unit="&deg;C" :threshold="temperature.threshold" />
+              <StatusBadge v-if="tempEffective" :flag="temperature.flag" :value="temperature.value" unit="&deg;C" :threshold="temperature.threshold" :offline="temperature.offline" />
               <PowerToggle v-model="tempOn" size="sm" :disabled="!boardOn" on-label="On" off-label="Off" />
             </div>
           </div>
 
           <template v-if="tempEffective">
             <div class="signal-value-row">
-              <span class="signal-value">{{ temperature.value ?? "--" }}</span>
+              <span class="signal-value">{{ fmt(temperature.value) }}</span>
               <span class="signal-unit">&deg;C</span>
             </div>
             <AreaChart :series="tempSeries" unit="&deg;C" color="var(--accent)" />
@@ -127,10 +147,10 @@ function onCaseSelect() {
           <div v-if="showReadout" class="readout-card">
             <div class="readout-row">
               <span class="readout-label">Temperature</span>
-              <StatusBadge v-if="tempEffective" :flag="temperature.flag" :value="temperature.value" unit="&deg;C" :threshold="temperature.threshold" />
+              <StatusBadge v-if="tempEffective" :flag="temperature.flag" :value="temperature.value" unit="&deg;C" :threshold="temperature.threshold" :offline="temperature.offline" />
             </div>
             <span class="readout-value">
-              <template v-if="tempEffective">{{ temperature.value ?? "--" }}&deg;C</template>
+              <template v-if="tempEffective">{{ fmt(temperature.value) }}&deg;C</template>
               <template v-else>Off</template>
             </span>
 
@@ -138,10 +158,10 @@ function onCaseSelect() {
 
             <div class="readout-row">
               <span class="readout-label">Sound</span>
-              <StatusBadge v-if="audioEffective" :flag="sound.flag" :value="sound.value" unit="" :threshold="sound.threshold" />
+              <StatusBadge v-if="audioEffective" :flag="sound.flag" :value="sound.value" unit="" :threshold="sound.threshold" :offline="sound.offline" />
             </div>
             <span class="readout-value small">
-              <template v-if="audioEffective">{{ sound.value ?? "--" }}</template>
+              <template v-if="audioEffective">{{ fmt(sound.value) }}</template>
               <template v-else>Off</template>
             </span>
           </div>
@@ -196,6 +216,11 @@ function onCaseSelect() {
 .status-pill.warn {
   color: var(--red);
   background: var(--red-soft);
+}
+
+.status-pill.offline {
+  color: var(--text-muted);
+  background: var(--surface-2);
 }
 
 .layout {

@@ -25,6 +25,12 @@ const loadPercent = computed(() => {
   const t = power.value.threshold || 1;
   return Math.round(Math.min(100, ((power.value.value ?? 0) / t) * 100));
 });
+
+/* Readings arrive with whatever precision the board/simulator happened to
+ * compute - always display exactly 2 decimal places. */
+function fmt(v) {
+  return typeof v === "number" ? v.toFixed(2) : "--";
+}
 </script>
 
 <template>
@@ -58,7 +64,7 @@ const loadPercent = computed(() => {
     />
 
     <section class="kpi-grid">
-      <KpiCard label="Current power" :value="power.value ?? '--'" unit="kW" :flag="power.flag">
+      <KpiCard label="Current power" :value="fmt(power.value)" unit="kW" :flag="power.flag">
         <MiniBars :values="powerBars" />
       </KpiCard>
 
@@ -72,11 +78,11 @@ const loadPercent = computed(() => {
         </div>
       </KpiCard>
 
-      <KpiCard label="Voltage" :value="power.extra.voltage ?? '--'" unit="V" flag="normal">
+      <KpiCard label="Voltage" :value="fmt(power.extra.voltage)" unit="V" flag="normal">
         <MiniBars :values="voltageBars" />
       </KpiCard>
 
-      <KpiCard label="Current" :value="power.extra.current ?? '--'" unit="A" flag="normal">
+      <KpiCard label="Current" :value="fmt(power.extra.current)" unit="A" flag="normal">
         <MiniBars :values="currentBars" />
       </KpiCard>
     </section>

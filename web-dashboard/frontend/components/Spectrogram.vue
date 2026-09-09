@@ -14,7 +14,7 @@ const props = defineProps({
 
 const canvasRef = ref(null);
 const BANDS = 28;
-let ctx, colW, lastLen = 0;
+let ctx, colW, lastTimestamp = -1;
 
 function bandIntensities(value, seed) {
   const out = new Array(BANDS);
@@ -54,12 +54,20 @@ function redrawAll() {
   ctx.fillRect(0, 0, w, ctx.canvas.height);
   const pts = props.history.slice(-Math.floor(w / colW));
   pts.forEach((p, i) => drawColumn(i * colW, p.v, p.t));
+  lastTimestamp = props.history.at(-1)?.t ?? -1;
 }
 
+/* Finds "new" points by timestamp, not by array length/index - the
+ * backend caps history at MAX_HISTORY_POINTS (push+shift), so once that
+ * cap is hit the array's length stops changing forever even though new
+ * points keep arriving at the end. A length-based watch/index (the
+ * previous approach) would false-negative from that point on and freeze
+ * the spectrogram permanently despite live data still flowing. */
 function appendColumns() {
-  if (!ctx || props.history.length <= lastLen) return;
-  const newPts = props.history.slice(lastLen);
-  lastLen = props.history.length;
+  if (!ctx) return;
+  const newPts = props.history.filter((p) => p.t > lastTimestamp);
+  if (newPts.length === 0) return;
+  lastTimestamp = newPts[newPts.length - 1].t;
   const w = ctx.canvas.width;
   const shift = newPts.length * colW;
   if (shift < w) {
@@ -78,8 +86,7 @@ onMounted(() => {
     canvas.height = 110;
     colW = 4;
     ctx = canvas.getContext("2d");
-    lastLen = 0;
-    redrawAll();
+    redrawAll(); // also resets lastTimestamp
   };
   setSize();
   resizeObserver = new ResizeObserver(setSize);
@@ -87,7 +94,10 @@ onMounted(() => {
 });
 onUnmounted(() => resizeObserver?.disconnect());
 
-watch(() => props.history.length, appendColumns);
+// Watches the array reference, not its length - live-state.js replaces
+// `history` with a fresh array on every WebSocket update regardless of
+// whether its length actually changed (see the comment on appendColumns()).
+watch(() => props.history, appendColumns);
 </script>
 
 <template>

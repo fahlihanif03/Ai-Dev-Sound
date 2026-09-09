@@ -15,14 +15,14 @@ Usage:
     python combined_bridge.py --url http://localhost:8787/api/ingest   # explicit override
     python combined_bridge.py --port COM5       # COM port override, any target
 
-Local dev needs `npm run worker:dev` running in web-dashboard/ first (no
+Local dev needs `npm run backend:dev` running in web-dashboard/ first (no
 INGEST_TOKEN required there - local Durable Objects aren't behind the
 deployed Worker's auth check). --target prod requires INGEST_TOKEN, either
 as an environment variable or read from ../web-dashboard/ingest-token.local.
 
 NOTE (2026-09-08): the deployed instance hit the Durable Object free tier's
 daily SQL-row-read quota after hours of continuous ticking (see
-worker/dashboard-do.ts's fix + comment) - that's why local is the default
+backend/dashboard-do.ts's fix + comment) - that's why local is the default
 here for now. Switch back to --target prod once the quota window resets.
 """
 import argparse

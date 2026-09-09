@@ -7,11 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "preview": "vite preview",
-    "worker:check": "tsc -p worker/tsconfig.json",
-    "worker:dev": "npm run build && wrangler dev",
-    "deploy": "npm run build && wrangler deploy"
+    "backend:check": "tsc -p backend/tsconfig.json",
+    "backend:dev": "npm run build && wrangler dev",
+    "deploy": "npm run build && wrangler deploy",
+    "pages:dev": "npm run build && wrangler pages dev --cwd pages",
+    "pages:deploy": "npm run build && wrangler pages deploy --cwd pages"
   },
   "dependencies": {
+    "hono": "^4.13.7",
     "three": "^0.185.1",
     "vue": "^3.5.41",
     "vue-router": "^4.6.4"

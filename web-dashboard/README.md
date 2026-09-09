@@ -17,14 +17,14 @@ demo, not a static mock.
 
 ## Architecture
 
-- **Frontend**: Vue 3 (`src/`), built with Vite, no external charting
+- **Frontend**: Vue 3 (`frontend/`), built with Vite, no external charting
   library - sparklines and the power chart are hand-rolled inline SVG per
   the design spec's "soft filled area, not sharp bar charts" requirement,
   which also sidesteps needing to pick/tune one of the two chart libraries
   the design PRD left as an open question.
-- **Backend**: a single Cloudflare Worker (`worker/index.ts`) serving the
+- **Backend**: a single Cloudflare Worker (`backend/index.ts`) serving the
   built frontend as static assets and routing `/api/*` to a Durable Object
-  (`worker/dashboard-do.ts`, `DashboardState`) that holds the live
+  (`backend/dashboard-do.ts`, `DashboardState`) that holds the live
   sound/temperature/power state, persists a short recent window in its
   SQLite storage (per the design PRD's explicit non-goal of long-term
   history), and broadcasts updates to every connected browser over
@@ -50,10 +50,10 @@ channel at a time without fighting the simulator. Optional bearer auth via
 ## Open items from the design PRD (resolved here with defaults, revisit if needed)
 
 - **Accent color**: a muted teal-green (no Mind Mechatronic/MindnRobotics
-  brand color was available) - swap `--accent` etc. in `src/style.css`.
+  brand color was available) - swap `--accent` etc. in `frontend/style.css`.
 - **Hero illustration**: simple generic line-art (a facility outline for
   Energy, a motor/fan glyph for Predictive Maintenance) rather than a
-  commissioned illustration - swap `src/components/HeroIllustration.vue`.
+  commissioned illustration - swap `frontend/components/HeroIllustration.vue`.
 - **Nav badge for the other page's status**: not implemented - the two
   pages are fully independent per the PRD's stated default ("should the two
   pages be fully independent" was left open; this build assumes yes).
@@ -62,8 +62,8 @@ channel at a time without fighting the simulator. Optional bearer auth via
 
 ```bash
 npm install
-npm run dev          # Vite dev server, frontend only (no live WebSocket data)
-npm run worker:dev    # full stack: builds + runs via wrangler dev (what you want for real testing)
-npm run worker:check  # type-check the Worker/Durable Object
-npm run deploy         # build + wrangler deploy
+npm run dev           # Vite dev server, frontend only (no live WebSocket data)
+npm run backend:dev   # full stack: builds + runs via wrangler dev (what you want for real testing)
+npm run backend:check # type-check the Worker/Durable Object
+npm run deploy        # build + wrangler deploy
 ```

@@ -30,20 +30,51 @@ interface Reading {
   threshold: number;
   unit: string;
   extra?: Record<string, number>;
+  /* True once a channel that has previously received a real ingest goes
+   * quiet for REAL_DATA_GRACE_MS - see alarm(). Channels that have never
+   * received a real ingest keep simulating instead (untouched demo mode). */
+  offline?: boolean;
 }
 
-const TICK_MS = 4000;
+const TICK_MS = 5000; // power cadence
+// 200ms turned out to be too aggressive for a Durable Object alarm in
+// practice - Miniflare threw "SQLite alarm handler canceled with
+// requestScheduledAlarm" + an uncaught internal error once the alarm was
+// being rescheduled every 200ms, risking the DO instance itself getting
+// torn down/restarted (which would have disrupted real board ingests too,
+// not just the simulator). 1s is still 5x faster than power and
+// comfortably clear of whatever internal minimum tripped that error - also
+// matches the firmware's own real send cadence for these two signals (see
+// wifi/telemetry.c's AUDIO_SEND_INTERVAL_MS/TEMP_SEND_INTERVAL_MS), so the
+// simulated and real-board experiences feel the same.
+const SOUND_TICK_MS = 1000;
+const TEMP_TICK_MS = 1000;
+const ALARM_RESOLUTION_MS = Math.min(TICK_MS, SOUND_TICK_MS, TEMP_TICK_MS); // how often the single alarm actually has to wake up to serve the fastest channel
+const IDLE_TICK_MS = 30_000; // alarm interval while no dashboard is connected - just checks back for reconnects
 const MAX_HISTORY_POINTS = 300; // per channel, in memory - short recent window only, per PRD non-goals
 const REAL_DATA_GRACE_MS = 60_000;
 const SQL_PRUNE_EVERY_N_WRITES = 300; // batches SQL cleanup instead of doing it every write
 
 const CHANNELS: Channel[] = ["sound", "temperature", "power"];
+const TICK_INTERVAL_MS: Record<Channel, number> = {
+  sound: SOUND_TICK_MS,
+  temperature: TEMP_TICK_MS,
+  power: TICK_MS,
+};
 
 export class DashboardState extends DurableObject<Env> {
   private lastRealIngestAt = new Map<Channel, number>();
+  private lastSimAt = new Map<Channel, number>(); // per-channel simulated-tick cadence, see TICK_INTERVAL_MS
   private latestMem = new Map<Channel, Reading>();
   private historyMem = new Map<Channel, { t: number; v: number }[]>();
-  private writesSinceCleanup = 0;
+  // Per-channel, not shared - a shared counter only prunes whichever
+  // channel's write happens to trip it, leaving the other channels'
+  // tables to grow ~3x past MAX_HISTORY_POINTS before their turn comes.
+  private writesSinceCleanup = new Map<Channel, number>();
+  // Which channels have already had their one-time "went offline" update
+  // broadcast, so we don't resend it every tick while it stays stale -
+  // cleared the moment real data resumes for that channel (see ingest()).
+  private offlineAnnounced = new Set<Channel>();
   private ready: Promise<void>;
 
   constructor(ctx: DurableObjectState, env: Env) {
@@ -63,7 +94,10 @@ export class DashboardState extends DurableObject<Env> {
       CREATE INDEX IF NOT EXISTS idx_readings_channel_t ON readings (channel, t)
     `);
 
-    for (const channel of CHANNELS) this.historyMem.set(channel, []);
+    for (const channel of CHANNELS) {
+      this.historyMem.set(channel, []);
+      this.writesSinceCleanup.set(channel, 0);
+    }
 
     // One-time rehydration from SQL on cold start - the only bulk SQL read
     // this DO ever does.
@@ -120,18 +154,59 @@ export class DashboardState extends DurableObject<Env> {
   async ingest(channel: Channel, reading: Reading) {
     await this.ready;
     this.lastRealIngestAt.set(channel, Date.now());
+    this.offlineAnnounced.delete(channel); // back online - re-arm the offline announcement for next time
     this.recordAndBroadcast(channel, reading);
   }
 
   async alarm() {
     await this.ready;
-    for (const channel of CHANNELS) {
-      const lastReal = this.lastRealIngestAt.get(channel) ?? 0;
-      if (Date.now() - lastReal > REAL_DATA_GRACE_MS) {
-        this.recordAndBroadcast(channel, simulateTick(channel));
-      }
+
+    // Nobody's watching - skip simulated writes entirely (they only exist
+    // to keep the dashboard visibly live) and just check back later in
+    // case someone (re)connects. Real board ingests still land immediately
+    // via ingest() regardless of this - this only affects the simulator.
+    // The DO's alarm previously ticked every TICK_MS forever, unconditionally,
+    // which was a real contributor to exhausting the Durable Object free
+    // tier's daily rows_read quota twice now (see docs/PROGRESS.md).
+    if (this.ctx.getWebSockets().length === 0) {
+      await this.ctx.storage.setAlarm(Date.now() + IDLE_TICK_MS);
+      return;
     }
-    await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
+
+    // One alarm serving multiple cadences: it wakes up every
+    // ALARM_RESOLUTION_MS (the fastest channel's interval), but each
+    // channel only actually ticks once its own TICK_INTERVAL_MS has
+    // elapsed since its last tick - sound gets a fresh simulated point
+    // ~5x/sec, temperature/power stay at their slower TICK_MS cadence.
+    const now = Date.now();
+    for (const channel of CHANNELS) {
+      const interval = TICK_INTERVAL_MS[channel];
+      const lastSim = this.lastSimAt.get(channel) ?? 0;
+      if (now - lastSim < interval) continue;
+      this.lastSimAt.set(channel, now);
+
+      const lastReal = this.lastRealIngestAt.get(channel);
+      if (lastReal === undefined) {
+        // Never received a real ingest for this channel - keep the demo
+        // simulator running so a fresh dashboard doesn't look dead before
+        // any board/bridge has ever connected to it.
+        this.recordAndBroadcast(channel, simulateTick(channel));
+        continue;
+      }
+
+      if (now - lastReal > REAL_DATA_GRACE_MS) {
+        // Was real, now stale: show it as offline instead of quietly
+        // switching to fake data - silently simulating here used to make
+        // turning the real board off look identical to it still running,
+        // which defeats the point of watching a real board's status.
+        if (!this.offlineAnnounced.has(channel)) {
+          this.offlineAnnounced.add(channel);
+          this.announceOffline(channel);
+        }
+      }
+      // else: real data is still fresh - nothing to do, ingest() already broadcast it.
+    }
+    await this.ctx.storage.setAlarm(now + ALARM_RESOLUTION_MS);
   }
 
   private recordAndBroadcast(channel: Channel, reading: Reading) {
@@ -154,19 +229,63 @@ export class DashboardState extends DurableObject<Env> {
       JSON.stringify(reading.extra ?? {})
     );
 
-    this.writesSinceCleanup++;
-    if (this.writesSinceCleanup >= SQL_PRUNE_EVERY_N_WRITES) {
-      this.writesSinceCleanup = 0;
+    // Per-channel counter - a single counter shared across all 3 channels
+    // would only prune whichever channel's write happened to trip it,
+    // leaving the other channels' tables to grow ~3x past
+    // MAX_HISTORY_POINTS before their turn came around.
+    const writes = (this.writesSinceCleanup.get(channel) ?? 0) + 1;
+    if (writes >= SQL_PRUNE_EVERY_N_WRITES) {
+      this.writesSinceCleanup.set(channel, 0);
       const oldestKept = hist[0]?.t ?? 0;
       // Direct comparison, no correlated subquery - cheap prune, run rarely.
       this.ctx.storage.sql.exec("DELETE FROM readings WHERE channel = ? AND t < ?", channel, oldestKept);
+    } else {
+      this.writesSinceCleanup.set(channel, writes);
     }
 
     const payload = JSON.stringify({
       type: "update",
       channel,
-      reading: { value: reading.value, flag: reading.flag, threshold: reading.threshold, unit: reading.unit, extra: reading.extra ?? {}, history: hist },
+      reading: {
+        value: reading.value,
+        flag: reading.flag,
+        threshold: reading.threshold,
+        unit: reading.unit,
+        extra: reading.extra ?? {},
+        offline: false, // a normal broadcast always means "not offline", clearing any earlier offline state client-side
+        history: hist,
+      },
     });
+    this.broadcast(payload);
+  }
+
+  /** One-time notice that a previously-real channel has gone stale - see
+   * alarm(). Doesn't touch SQL/history (an "offline" marker isn't a
+   * measurement), just updates the in-memory latest state and tells
+   * connected clients, so a fresh page load also sees it via buildSnapshot(). */
+  private announceOffline(channel: Channel) {
+    const last = this.latestMem.get(channel);
+    if (!last) return; // nothing has ever been recorded for this channel - nothing to mark offline
+    const offlineReading: Reading = { ...last, offline: true };
+    this.latestMem.set(channel, offlineReading);
+    const hist = this.historyMem.get(channel) ?? [];
+    const payload = JSON.stringify({
+      type: "update",
+      channel,
+      reading: {
+        value: offlineReading.value,
+        flag: offlineReading.flag,
+        threshold: offlineReading.threshold,
+        unit: offlineReading.unit,
+        extra: offlineReading.extra ?? {},
+        offline: true,
+        history: hist,
+      },
+    });
+    this.broadcast(payload);
+  }
+
+  private broadcast(payload: string) {
     for (const ws of this.ctx.getWebSockets()) {
       try {
         ws.send(payload);

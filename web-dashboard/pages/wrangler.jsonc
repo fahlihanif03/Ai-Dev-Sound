@@ -1,0 +1,29 @@
+{
+  "$schema": "../node_modules/wrangler/config-schema.json",
+  // Cloudflare Pages project - this is what gives the *.pages.dev domain.
+  // Deploy with: npm run pages:deploy (builds the frontend, then runs
+  // `wrangler pages deploy` with this directory as cwd - `wrangler pages
+  // deploy` has no --config flag in this wrangler version, so the config
+  // file has to be the default-named wrangler.jsonc, discovered via --cwd,
+  // living next to functions/ so file-based routing resolves correctly).
+  //
+  // This project does NOT own the DashboardState Durable Object - Pages
+  // projects can't define new DO classes, only bind to one hosted by an
+  // existing Worker (see script_name below, and ../backend/app.ts's
+  // comment). That Worker (../wrangler.jsonc, name "demo-kit-dashboard")
+  // must already be deployed - via `npm run deploy` from web-dashboard/ -
+  // before this config's binding resolves.
+  "name": "demo-kit-dashboard-pages",
+  "pages_build_output_dir": "../dist",
+  "compatibility_date": "2025-06-01",
+  "compatibility_flags": ["nodejs_compat"],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "DASHBOARD_STATE",
+        "class_name": "DashboardState",
+        "script_name": "demo-kit-dashboard"
+      }
+    ]
+  }
+}
