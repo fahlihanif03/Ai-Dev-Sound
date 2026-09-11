@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref } from "vue";
 import { useLiveStore } from "../stores/live.js";
-import PCViewer from "../components/PCViewer.vue";
+import DeviceIllustration from "../components/DeviceIllustration.vue";
 import StatusBadge from "../components/StatusBadge.vue";
 import Spectrogram from "../components/Spectrogram.vue";
 import LevelMeter from "../components/LevelMeter.vue";
@@ -142,7 +142,7 @@ function onCaseSelect() {
       </div>
 
       <div class="pc-col">
-        <PCViewer @select="onCaseSelect" />
+        <DeviceIllustration @select="onCaseSelect" />
 
         <Transition name="pop">
           <div v-if="showReadout" class="readout-card">
@@ -178,12 +178,12 @@ function onCaseSelect() {
 <style scoped>
 /* The whole app is on this same light theme now (see style.css's :root),
  * --stage/--stage-2 included - those stay dark globally on purpose, so
- * the PC model below keeps its dramatic dark "stage" backdrop (its
- * lighting is tuned for that) even though everything around it is light,
- * mirroring how Energy Monitoring's own hero panel stays a distinct
- * accent-colored panel rather than plain white. This page just wraps its
- * content in the same slightly-off-white rounded panel Energy Monitoring
- * uses (var(--bg), distinct from var(--page-bg) behind it). */
+ * the device illustration below keeps its dark "stage" backdrop even
+ * though everything around it is light, mirroring how Energy
+ * Monitoring's own hero panel stays a distinct accent-colored panel
+ * rather than plain white. This page just wraps its content in the
+ * same slightly-off-white rounded panel Energy Monitoring uses
+ * (var(--bg), distinct from var(--page-bg) behind it). */
 .page {
   background: var(--bg);
   color: var(--text);
