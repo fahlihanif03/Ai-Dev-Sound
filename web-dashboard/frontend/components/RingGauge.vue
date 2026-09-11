@@ -1,0 +1,98 @@
+<script setup>
+import { computed } from "vue";
+
+/* Circular tick-ring gauge, matching the reference's "Overview"/rotor-hub
+ * style dial: a ring of small tick marks around the edge, a colored arc
+ * showing the current ratio, and a big value centered in the middle. */
+const props = defineProps({
+  ratio: { type: Number, default: 0 }, // 0..1
+  value: { type: [String, Number], default: "--" },
+  unit: { type: String, default: "" },
+  color: { type: String, default: "var(--accent)" },
+  tickCount: { type: Number, default: 24 },
+});
+
+const size = 168;
+const stroke = 10;
+const r = (size - stroke) / 2;
+const circumference = 2 * Math.PI * r;
+const clamped = computed(() => Math.max(0, Math.min(1, props.ratio)));
+const dash = computed(() => clamped.value * circumference);
+
+const ticks = computed(() => {
+  const out = [];
+  for (let i = 0; i < props.tickCount; i++) {
+    const angle = (i / props.tickCount) * 2 * Math.PI - Math.PI / 2;
+    const lit = i / props.tickCount <= clamped.value;
+    const x1 = size / 2 + Math.cos(angle) * (r + stroke / 2 + 3);
+    const y1 = size / 2 + Math.sin(angle) * (r + stroke / 2 + 3);
+    const x2 = size / 2 + Math.cos(angle) * (r + stroke / 2 + 8);
+    const y2 = size / 2 + Math.sin(angle) * (r + stroke / 2 + 8);
+    out.push({ x1, y1, x2, y2, lit });
+  }
+  return out;
+});
+</script>
+
+<template>
+  <div class="ring-gauge" :style="{ width: `${size + 20}px`, height: `${size + 20}px` }">
+    <svg :viewBox="`0 0 ${size} ${size}`" :width="size" :height="size" class="ring-svg">
+      <circle :cx="size / 2" :cy="size / 2" :r="r" fill="none" stroke="var(--border-soft-2)" :stroke-width="stroke" />
+      <circle
+        :cx="size / 2" :cy="size / 2" :r="r" fill="none" :stroke="color" :stroke-width="stroke"
+        :stroke-dasharray="`${dash} ${circumference}`"
+        stroke-linecap="round"
+        :transform="`rotate(-90 ${size / 2} ${size / 2})`"
+      />
+      <line v-for="(t, i) in ticks" :key="i" :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2" :class="['tick', { lit: t.lit }]" />
+    </svg>
+    <div class="ring-center">
+      <span class="ring-value">{{ value }}</span>
+      <span v-if="unit" class="ring-unit">{{ unit }}</span>
+    </div>
+  </div>
+</template>
+
+<style scoped>
+.ring-gauge {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.ring-svg {
+  overflow: visible;
+}
+
+.tick {
+  stroke: var(--border-soft-2);
+  stroke-width: 1.6;
+}
+
+.tick.lit {
+  stroke: var(--accent-2);
+}
+
+.ring-center {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+}
+
+.ring-value {
+  font-size: 22px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.ring-unit {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+</style>
