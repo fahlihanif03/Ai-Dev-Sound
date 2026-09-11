@@ -27,6 +27,12 @@ function emptyChannel() {
     unit: "",
     extra: {},
     offline: false,
+    // False until a real board ingest actually arrives for this channel
+    // - see dashboard-do.ts's Reading.real. Distinct from `offline`:
+    // this starts false and a channel that's simulating (never had real
+    // data) stays false too, whereas `offline` only flips true for a
+    // channel that WAS real and went stale.
+    real: false,
     history: [],
   };
 }

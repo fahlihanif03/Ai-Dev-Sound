@@ -34,6 +34,16 @@ interface Reading {
    * quiet for REAL_DATA_GRACE_MS - see alarm(). Channels that have never
    * received a real ingest keep simulating instead (untouched demo mode). */
   offline?: boolean;
+  /* True only while this channel is currently backed by a real board
+   * ingest within REAL_DATA_GRACE_MS - false both for simulated data
+   * (never received a real ingest) and for stale/offline data. Lets the
+   * client tell "genuinely live" apart from "still showing something
+   * plausible" - see recordAndBroadcast()'s isReal(). Added because the
+   * dashboard's own WebSocket-connected status was being read as "the
+   * board is online", when it only ever meant "this browser tab has a
+   * live connection to our own server" - true almost all the time
+   * regardless of whether any physical board was ever connected. */
+  real?: boolean;
 }
 
 const TICK_MS = 5000; // power cadence
@@ -225,6 +235,15 @@ export class DashboardState extends DurableObject<Env> {
     await this.ctx.storage.setAlarm(now + ALARM_RESOLUTION_MS);
   }
 
+  /* True only while `channel` currently has a real ingest within
+   * REAL_DATA_GRACE_MS - see Reading.real's comment for why this exists
+   * as its own field rather than being inferred from `offline`/WS state
+   * client-side. */
+  private isReal(channel: Channel): boolean {
+    const lastReal = this.lastRealIngestAt.get(channel);
+    return lastReal !== undefined && Date.now() - lastReal <= REAL_DATA_GRACE_MS;
+  }
+
   private recordAndBroadcast(channel: Channel, reading: Reading) {
     const t = Date.now();
 
@@ -269,6 +288,7 @@ export class DashboardState extends DurableObject<Env> {
         unit: reading.unit,
         extra: reading.extra ?? {},
         offline: false, // a normal broadcast always means "not offline", clearing any earlier offline state client-side
+        real: this.isReal(channel),
         history: hist,
       },
     });
@@ -295,6 +315,7 @@ export class DashboardState extends DurableObject<Env> {
         unit: offlineReading.unit,
         extra: offlineReading.extra ?? {},
         offline: true,
+        real: false,
         history: hist,
       },
     });
@@ -313,7 +334,11 @@ export class DashboardState extends DurableObject<Env> {
 
   private latestFor(channel: Channel): Reading & { history: { t: number; v: number }[] } {
     const reading = this.latestMem.get(channel) ?? simulateTick(channel);
-    return { ...reading, history: this.historyMem.get(channel) ?? [] };
+    // real recomputed fresh here (not read off the stored reading) since
+    // it can go stale between writes - e.g. a page loads and calls this
+    // well after the last ingest, past REAL_DATA_GRACE_MS, without any
+    // new broadcast having fired to update a stored flag.
+    return { ...reading, real: this.isReal(channel), history: this.historyMem.get(channel) ?? [] };
   }
 
   private buildSnapshot() {

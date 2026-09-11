@@ -176,11 +176,23 @@ const powerQualityLabel = computed(() => {
         <section class="chart-card">
           <div class="card-head">
             <h2 class="card-title">Real-time Energy Consumption</h2>
-            <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--green)]">
-              <span class="h-2 w-2 rounded-full bg-[var(--green)]"></span>Live
+            <!-- Reflects power.real (see dashboard-do.ts's Reading.real),
+                 not just "a WebSocket message arrived" - the chart used
+                 to say "Live" even while showing the demo simulator's
+                 output, which looks just as smooth/plausible as real
+                 board data and gave no visual sign it wasn't. Dimming
+                 the chart itself (not just relabeling the badge) below
+                 so a simulated/offline period is obvious at a glance,
+                 not just on close reading of a small badge. -->
+            <span
+              class="inline-flex items-center gap-1.5 text-xs font-semibold"
+              :class="power.real ? 'text-[var(--green)]' : 'text-[var(--text-muted)]'"
+            >
+              <span class="h-2 w-2 rounded-full" :class="power.real ? 'bg-[var(--green)]' : 'bg-[var(--text-faint)]'"></span>
+              {{ power.real ? "Live" : power.offline ? "Offline" : "Simulated" }}
             </span>
           </div>
-          <AreaChart :series="power.history" unit="kW" color="var(--accent)" />
+          <AreaChart :series="power.history" unit="kW" :color="power.real ? 'var(--accent)' : 'var(--text-faint)'" :class="{ 'opacity-50 grayscale': !power.real }" />
         </section>
 
         <div class="small-grid">
