@@ -21,88 +21,42 @@ const dateTimeLabel = computed(() =>
 </script>
 
 <template>
-  <header class="app-header">
-    <div class="brand">
-      <span class="brand-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none">
-          <path d="M12 2 L4 13h6l-1 9 9-13h-6z" fill="#ff6a1a" />
-        </svg>
-      </span>
-      <span class="brand-name">Demo Kit</span>
-    </div>
-
-    <nav class="nav">
-      <router-link to="/" class="nav-link">Energy</router-link>
-      <router-link to="/predictive-maintenance" class="nav-link">Predictive Maintenance</router-link>
-    </nav>
-
+  <header class="topbar">
     <div class="status-cluster">
       <span class="datetime">{{ dateTimeLabel }}</span>
       <span class="conn" :class="{ online: state.connected }">
         <span class="dot"></span>
         {{ state.connected ? "Online" : "Offline" }}
       </span>
+    </div>
+
+    <div class="icon-cluster">
       <button class="icon-btn" type="button" aria-label="Notifications">
         <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" stroke-width="1.8">
           <path d="M18 8a6 6 0 1 0-12 0c0 7-3 9-3 9h18s-3-2-3-9" stroke-linecap="round" stroke-linejoin="round" />
           <path d="M13.7 21a2 2 0 0 1-3.4 0" stroke-linecap="round" />
         </svg>
       </button>
+      <span class="avatar" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="8" r="3.4" />
+          <path d="M5 20c1.4-3.6 4.2-5.5 7-5.5s5.6 1.9 7 5.5" stroke-linecap="round" />
+        </svg>
+      </span>
     </div>
   </header>
 </template>
 
 <style scoped>
-.app-header {
+.topbar {
   display: flex;
   align-items: center;
-  gap: 24px;
-  padding: 22px clamp(20px, 4vw, 48px) 8px;
-}
-
-.brand {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-weight: 700;
-  font-size: 15px;
-}
-
-.brand-mark {
-  display: inline-flex;
-  width: 28px;
-  height: 28px;
-  align-items: center;
-  justify-content: center;
-  border-radius: 9px;
-  background: var(--accent-soft);
-}
-
-.nav {
-  display: flex;
-  gap: 2px;
-  background: var(--surface);
-  border-radius: var(--radius-pill);
-  padding: 5px;
-  box-shadow: var(--shadow-sm);
-}
-
-.nav-link {
-  padding: 9px 18px;
-  border-radius: var(--radius-pill);
-  font-size: 13.5px;
-  font-weight: 600;
-  color: var(--text-muted);
-  transition: background 0.15s ease, color 0.15s ease;
-}
-
-.nav-link.router-link-exact-active {
-  background: var(--accent-grad);
-  color: #fff;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 4px clamp(20px, 4vw, 48px) 0;
 }
 
 .status-cluster {
-  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 16px;
@@ -127,7 +81,14 @@ const dateTimeLabel = computed(() =>
   background: var(--accent);
 }
 
-.icon-btn {
+.icon-cluster {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.icon-btn,
+.avatar {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -136,20 +97,23 @@ const dateTimeLabel = computed(() =>
   border-radius: 50%;
   border: none;
   background: var(--surface);
-  color: var(--text);
+  color: var(--text-muted);
   box-shadow: var(--shadow-sm);
+}
+
+.icon-btn {
   cursor: default;
 }
 
+.avatar {
+  background: var(--accent-soft);
+  color: var(--accent);
+}
+
 @media (max-width: 720px) {
-  .app-header {
+  .topbar {
     flex-wrap: wrap;
     row-gap: 12px;
-  }
-  .status-cluster {
-    margin-left: 0;
-    width: 100%;
-    justify-content: space-between;
   }
 }
 </style>

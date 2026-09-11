@@ -104,37 +104,11 @@ function fmt(v) {
 </template>
 
 <style scoped>
-/* Light theme, scoped to this page only - the rest of the app (header,
- * Predictive Maintenance's 3D PC viewer) stays on the shared dark theme
- * in style.css. Every component below (KpiCard, MiniBars, MiniDonut,
- * AlertBanner, AreaChart) already reads these same var(--x) names, so
- * overriding them here on .page is enough to reskin the whole subtree -
- * no per-component changes needed, custom properties cascade through the
- * DOM regardless of Vue's component/scoping boundaries. Palette follows
- * the Panelto-style reference: warm cream background, white cards, deep
- * green + gold accents instead of the app's usual near-black/orange. */
+/* The whole app is on this same light theme now (see style.css's :root) -
+ * this page just wraps its content in a slightly-off-white rounded panel
+ * (var(--bg), distinct from the page-level var(--page-bg) behind it and
+ * from cards' var(--surface)) rather than redeclaring the palette itself. */
 .page {
-  --bg: #fbf3da;
-  --surface: #ffffff;
-  --surface-2: #f4ecd4;
-  --border-soft: rgba(31, 46, 26, 0.08);
-  --border-soft-2: rgba(31, 46, 26, 0.14);
-  --text: #23301f;
-  --text-muted: #71806b;
-  --text-faint: #a3ac9a;
-  --accent: #2f6b3d;
-  --accent-2: #e0b53c;
-  --accent-soft: rgba(47, 107, 61, 0.12);
-  --accent-grad: linear-gradient(90deg, #2f6b3d, #e0b53c);
-  --amber: #c98a1f;
-  --amber-soft: rgba(201, 138, 31, 0.16);
-  --red: #c8503f;
-  --red-soft: rgba(200, 80, 63, 0.14);
-  --green: #2f6b3d;
-  --green-soft: rgba(47, 107, 61, 0.12);
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 36px rgba(35, 48, 31, 0.1);
-  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 14px rgba(35, 48, 31, 0.07);
-
   background: var(--bg);
   color: var(--text);
   border-radius: var(--radius-xl);
