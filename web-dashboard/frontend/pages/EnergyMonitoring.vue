@@ -168,7 +168,7 @@ const powerQualityLabel = computed(() => {
           <span class="eyebrow">Energy Monitoring</span>
           <span class="status-pill" :class="{ warn: !overallOk }">{{ overallOk ? "Normal" : "Attention" }}</span>
         </div>
-        <RingGauge :ratio="loadRatio" :value="`${loadPercent}%`" unit="Total load" color="var(--accent)" track="rgba(255,255,255,0.25)" glow />
+        <RingGauge :ratio="loadRatio" :value="`${loadPercent}%`" unit="Total load" color="var(--accent)" glow />
         <p class="hero-caption">Live status for the monitored circuit &mdash; {{ overallOk ? "everything's running normally." : "attention needed." }}</p>
       </div>
 
@@ -313,24 +313,20 @@ const powerQualityLabel = computed(() => {
   align-items: stretch;
 }
 
-/* Deep charcoal-to-orange gradient, standing in for the reference's
- * full-bleed product photo (no real photography of this demo kit exists
- * to use here) - still gives the hero the same "rich, edge-to-edge
- * visual, no white card chrome" treatment, just via gradient + rim-light
- * glow instead of a photo. Text inside is light since it now sits on a
- * dark ground, unlike the rest of the (light-themed) page. */
+/* Plain white card, matching every other card on the page - was a dark
+ * gradient standing in for a product photo, dropped per explicit
+ * feedback that the color/darkness was disliked. Simpler is better here
+ * than chasing any particular mockup's "hero visual" convention. */
 .hero-panel {
-  background:
-    radial-gradient(circle at 82% 18%, rgba(var(--accent-rgb), 0.55), transparent 55%),
-    linear-gradient(155deg, #23262b, #15171a 70%);
+  background: var(--surface);
   border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-sm);
   padding: 22px;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
   text-align: center;
-  color: #f4f1ec;
 }
 
 .hero-head {
@@ -353,18 +349,18 @@ const powerQualityLabel = computed(() => {
   font-size: 11px;
   font-weight: 700;
   color: var(--accent);
-  background: var(--surface);
+  background: var(--accent-soft);
   padding: 4px 10px;
   border-radius: var(--radius-pill);
-  box-shadow: var(--shadow-sm);
 }
 
 .status-pill.warn {
   color: var(--red);
+  background: var(--red-soft);
 }
 
 .hero-caption {
-  color: rgba(244, 241, 236, 0.6);
+  color: var(--text-muted);
   font-size: 13px;
   max-width: 260px;
 }
