@@ -3,16 +3,17 @@ import { useRoute } from "vue-router";
 
 const route = useRoute();
 
-/* Only the first two entries are real, working pages - the rest mirror
- * categories from the reference sidebar (Executive Overview, Tariff &
- * Cost, Carbon & Sustainability, etc.) that this board has no way to
- * back with real data (billing/tariffs, CO2, a settings/config system
- * that doesn't exist here) - see the Tailwind-migration commit's note on
- * the same tradeoff for the Energy Analytics/Carbon/Tariff pages that
- * were skipped outright. Rather than silently omitting them (losing the
- * full sidebar the reference shows) or faking them as clickable, they're
- * shown disabled with a "Soon" tag - honest about what's actually here
- * without giving up the visual.
+/* Dashboard, Predictive Maintenance, and Load Analytics link to real
+ * pages backed by real board data. Tariff & Cost also links to a real
+ * page, but its content is real published TNB tariff rates rather than
+ * anything this board measures itself (see TariffStructure.vue's own
+ * sourcing note). Carbon & Sustainability links to a page that's
+ * intentionally demo-only data (see that page's DemoDataBanner) - shown
+ * as a real link, not "Soon", since the page itself is honest about
+ * being a placeholder rather than needing to be hidden. Executive
+ * Overview, Alarms & Health, and Settings genuinely don't exist yet -
+ * shown disabled with a "Soon" tag rather than either omitted (losing
+ * the full sidebar the reference shows) or faking them as clickable.
  * Colors are per-category (mirroring the reference's own varied icon
  * chips), not the app's single accent - the active item still gets the
  * accent treatment regardless of its own category color, same as the
@@ -33,9 +34,9 @@ const items = [
     icon: 'M4 4h16v16H4z|M9 9h6v6H9z',
   },
   { title: "Executive Overview", subtitle: "KPIs and trends", color: "#0d9488", icon: "M3 17 9 11l4 4 8-8", soon: true },
-  { title: "Load Analytics", subtitle: "Demand analysis", color: "#4f46e5", icon: "M3 12h4l2-7 4 14 2-7h6", soon: true },
-  { title: "Tariff & Cost", subtitle: "ETOU & billing", color: "#16a34a", icon: "$", soon: true },
-  { title: "Carbon & Sustainability", subtitle: "ESG reporting", color: "#059669", icon: "leaf", soon: true },
+  { to: "/analytics", title: "Load Analytics", subtitle: "Demand analysis", color: "#4f46e5", icon: "M3 12h4l2-7 4 14 2-7h6" },
+  { to: "/tariff", title: "Tariff & Cost", subtitle: "ETOU & billing", color: "#16a34a", icon: "$" },
+  { to: "/carbon", title: "Carbon & Sustainability", subtitle: "ESG reporting", color: "#059669", icon: "leaf" },
   { title: "Alarms & Health", subtitle: "System status", color: "#dc2626", icon: "warn", soon: true },
   { title: "Settings", subtitle: "System config", color: "#64748b", icon: "gear", soon: true },
 ];

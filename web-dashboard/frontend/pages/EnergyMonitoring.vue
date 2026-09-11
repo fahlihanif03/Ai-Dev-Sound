@@ -41,14 +41,35 @@ function fmt(v) {
   return typeof v === "number" ? v.toFixed(2) : "--";
 }
 
-/* Real derived stats for the KPI strip below - not fabricated. Peak is a
- * genuine max() over whatever history is currently loaded (so it moves
- * as the window grows, same honesty rule as everything else this app
- * shows: no invented cost/CO2/billing figures the board doesn't measure). */
+/* Real derived stats for the KPI strip below - not fabricated. Peak/
+ * average are genuine max()/mean() over whatever history is currently
+ * loaded (so they move as the window grows), same honesty rule as
+ * everything else this app shows: no invented cost/CO2/billing figures
+ * the board doesn't measure. */
 const peakPower = computed(() => {
   const h = power.value.history;
   return h.length ? Math.max(...h.map((p) => p.v ?? 0)) : null;
 });
+const averagePower = computed(() => {
+  const h = power.value.history;
+  return h.length ? h.reduce((sum, p) => sum + (p.v ?? 0), 0) / h.length : null;
+});
+/* Real ratio, not fabricated - how much of the peak draw the average
+ * draw represents over this window. Same concept as a utility's real
+ * "load factor" metric, just computed from this app's own real history
+ * instead of a billing-cycle demand record. */
+const loadFactor = computed(() => {
+  if (!peakPower.value || !averagePower.value) return null;
+  return (averagePower.value / peakPower.value) * 100;
+});
+
+/* Today's Cost and CO2 Saved below are placeholder demo values, tagged
+ * as such in the template - this board has no tariff rate applied
+ * anywhere and doesn't measure CO2 at all, so there's no real number to
+ * show here (see TariffStructure.vue and CarbonSustainability.vue for
+ * where those actually live - one real, one explicitly demo). */
+const demoTodaysCost = "RM 12.40";
+const demoCo2Saved = "0.8 kg";
 
 /* Real % change vs the immediately previous reading. Voltage/current
  * don't get a delta - the backend only stores {t, v} per history point
@@ -102,9 +123,25 @@ const powerQualityLabel = computed(() => {
         </span>
       </div>
 
+      <!-- Demo tag, not "live reading" - this pair is placeholder data,
+           see demoTodaysCost/demoCo2Saved above. Voltage/Current (real)
+           moved to the Overview/Voltage & Current cards further down,
+           matching the reference's exact 4-card top row instead of
+           duplicating real stats shown again below. -->
       <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
         <div class="flex flex-col gap-1">
-          <span class="text-[13px] font-medium text-[var(--text-muted)]">Peak Power</span>
+          <span class="text-[13px] font-medium text-[var(--text-muted)]">Today's Cost</span>
+          <span class="text-xl font-extrabold tracking-tight">{{ demoTodaysCost }}</span>
+          <span class="inline-flex w-fit items-center rounded-full bg-[var(--amber-soft)] px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-[var(--amber)] uppercase">Demo</span>
+        </div>
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--amber-soft)] text-[var(--amber)]">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2v20M17 6.5a4 4 0 0 0-4-2.5h-1a3.5 3.5 0 0 0 0 7h1a3.5 3.5 0 0 1 0 7h-1a4 4 0 0 1-4-2.5" stroke-linecap="round" /></svg>
+        </span>
+      </div>
+
+      <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-[13px] font-medium text-[var(--text-muted)]">Peak Demand</span>
           <span class="text-xl font-extrabold tracking-tight">{{ fmt(peakPower) }} <small class="text-xs font-semibold text-[var(--text-muted)]">kW</small></span>
           <span class="text-xs font-semibold text-[var(--text-faint)]">this window</span>
         </div>
@@ -115,23 +152,12 @@ const powerQualityLabel = computed(() => {
 
       <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
         <div class="flex flex-col gap-1">
-          <span class="text-[13px] font-medium text-[var(--text-muted)]">Voltage</span>
-          <span class="text-xl font-extrabold tracking-tight">{{ fmt(power.extra.voltage) }} <small class="text-xs font-semibold text-[var(--text-muted)]">V</small></span>
-          <span class="text-xs font-semibold text-[var(--text-faint)]">live reading</span>
+          <span class="text-[13px] font-medium text-[var(--text-muted)]">CO&#8322; Saved</span>
+          <span class="text-xl font-extrabold tracking-tight">{{ demoCo2Saved }}</span>
+          <span class="inline-flex w-fit items-center rounded-full bg-[var(--amber-soft)] px-1.5 py-0.5 text-[9.5px] font-bold tracking-wide text-[var(--amber)] uppercase">Demo</span>
         </div>
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" stroke-linecap="round" /></svg>
-        </span>
-      </div>
-
-      <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
-        <div class="flex flex-col gap-1">
-          <span class="text-[13px] font-medium text-[var(--text-muted)]">Current</span>
-          <span class="text-xl font-extrabold tracking-tight">{{ fmt(power.extra.current) }} <small class="text-xs font-semibold text-[var(--text-muted)]">A</small></span>
-          <span class="text-xs font-semibold text-[var(--text-faint)]">live reading</span>
-        </div>
-        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
-          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 5 13h6l-1 9 9-13h-6z" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--green-soft)] text-[var(--green)]">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 21c8 0 14-6 14-16-10 0-16 6-16 14 0 1 .3 2 1 2 4-5 8-8 12-10" stroke-linecap="round" stroke-linejoin="round" /></svg>
         </span>
       </div>
     </section>
@@ -149,11 +175,9 @@ const powerQualityLabel = computed(() => {
       <div class="right-col">
         <section class="chart-card">
           <div class="card-head">
-            <h2 class="card-title">Power draw</h2>
-            <span class="card-arrow" aria-hidden="true">
-              <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" stroke-width="2">
-                <path d="M7 17 17 7M9 7h8v8" stroke-linecap="round" stroke-linejoin="round" />
-              </svg>
+            <h2 class="card-title">Real-time Energy Consumption</h2>
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-[var(--green)]">
+              <span class="h-2 w-2 rounded-full bg-[var(--green)]"></span>Live
             </span>
           </div>
           <AreaChart :series="power.history" unit="kW" color="var(--accent)" />
@@ -231,6 +255,37 @@ const powerQualityLabel = computed(() => {
           </div>
           <RingGauge :ratio="voltageRatio" :value="fmt(power.extra.voltage)" unit="V" color="var(--accent)" track="#3a3f47" glow />
         </div>
+      </div>
+    </section>
+
+    <!-- Demand Analysis - genuinely real, computed from the loaded
+         history's actual peak/average (see peakPower/averagePower/
+         loadFactor above), not the reference's fabricated billing-cycle
+         version of this same card concept. -->
+    <section class="rounded-2xl bg-[var(--surface)] p-6 shadow-[var(--shadow-sm)]">
+      <h2 class="mb-5 text-[15px] font-bold">Demand Analysis</h2>
+      <div class="flex items-end justify-center gap-10 pb-2">
+        <div class="flex flex-col items-center gap-2">
+          <div class="flex h-28 w-16 items-end">
+            <div class="w-full rounded-t-lg" style="height: 100%; background: linear-gradient(180deg, var(--accent-2), var(--accent))"></div>
+          </div>
+          <span class="text-sm font-bold">{{ fmt(peakPower) }} kW</span>
+          <span class="text-[11px] text-[var(--text-muted)]">Peak</span>
+        </div>
+        <div class="flex flex-col items-center gap-2">
+          <div class="flex h-28 w-16 items-end">
+            <div
+              class="w-full rounded-t-lg bg-[var(--green)]"
+              :style="{ height: peakPower ? `${Math.max(6, (averagePower / peakPower) * 100)}%` : '6%' }"
+            ></div>
+          </div>
+          <span class="text-sm font-bold">{{ fmt(averagePower) }} kW</span>
+          <span class="text-[11px] text-[var(--text-muted)]">Average</span>
+        </div>
+      </div>
+      <div class="mt-4 flex items-center justify-between rounded-lg bg-[var(--surface-2)] px-4 py-3 text-sm">
+        <span class="text-[var(--text-muted)]">Load Factor</span>
+        <span class="font-bold">{{ loadFactor !== null ? loadFactor.toFixed(1) + "%" : "--" }}</span>
       </div>
     </section>
   </div>
