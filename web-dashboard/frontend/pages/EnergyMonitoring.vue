@@ -1,7 +1,6 @@
 <script setup>
 import { computed } from "vue";
 import { state } from "../lib/live-state.js";
-import ThreeHero from "../components/ThreeHero.vue";
 import KpiCard from "../components/KpiCard.vue";
 import MiniBars from "../components/MiniBars.vue";
 import MiniDonut from "../components/MiniDonut.vue";
@@ -17,8 +16,8 @@ const currentBars = computed(() => power.value.history.slice(-10).map((p) => p.e
 const voltageBars = computed(() => power.value.history.slice(-10).map((p) => p.extra?.voltage ?? 0));
 const pf = computed(() => power.value.extra?.powerFactor ?? 0);
 
-/* "Total Energy" readout on the floating card: how close current draw sits
- * to the anomaly threshold, as a percentage - a stand-in for a battery/
+/* "Total load" readout on the hero card: how close current draw sits to
+ * the anomaly threshold, as a percentage - a stand-in for a battery/
  * charge-style percentage since this demo kit doesn't have real energy
  * storage to report on. */
 const loadPercent = computed(() => {
@@ -43,11 +42,21 @@ function fmt(v) {
       </div>
 
       <div class="hero-visual">
-        <ThreeHero variant="energy" />
+        <div class="badge-cluster">
+          <div class="stat-badge stat-badge-primary">
+            <span class="stat-badge-value">{{ loadPercent }}%</span>
+            <span class="stat-badge-label">Total load</span>
+          </div>
+          <div class="stat-badge stat-badge-secondary">
+            <span class="stat-badge-value">{{ pf.toFixed(2) }}</span>
+            <span class="stat-badge-label">Power factor</span>
+          </div>
+        </div>
+
         <div class="floating-card">
           <div class="floating-row">
             <span class="floating-label">Total load</span>
-            <span class="floating-badge">{{ overallOk ? "Normal" : "Attention" }}</span>
+            <span class="floating-badge" :class="{ warn: !overallOk }">{{ overallOk ? "Normal" : "Attention" }}</span>
           </div>
           <div class="progress-track">
             <div class="progress-fill" :style="{ width: loadPercent + '%' }"></div>
@@ -95,7 +104,40 @@ function fmt(v) {
 </template>
 
 <style scoped>
+/* Light theme, scoped to this page only - the rest of the app (header,
+ * Predictive Maintenance's 3D PC viewer) stays on the shared dark theme
+ * in style.css. Every component below (KpiCard, MiniBars, MiniDonut,
+ * AlertBanner, AreaChart) already reads these same var(--x) names, so
+ * overriding them here on .page is enough to reskin the whole subtree -
+ * no per-component changes needed, custom properties cascade through the
+ * DOM regardless of Vue's component/scoping boundaries. Palette follows
+ * the Panelto-style reference: warm cream background, white cards, deep
+ * green + gold accents instead of the app's usual near-black/orange. */
 .page {
+  --bg: #fbf3da;
+  --surface: #ffffff;
+  --surface-2: #f4ecd4;
+  --border-soft: rgba(31, 46, 26, 0.08);
+  --border-soft-2: rgba(31, 46, 26, 0.14);
+  --text: #23301f;
+  --text-muted: #71806b;
+  --text-faint: #a3ac9a;
+  --accent: #2f6b3d;
+  --accent-2: #e0b53c;
+  --accent-soft: rgba(47, 107, 61, 0.12);
+  --accent-grad: linear-gradient(90deg, #2f6b3d, #e0b53c);
+  --amber: #c98a1f;
+  --amber-soft: rgba(201, 138, 31, 0.16);
+  --red: #c8503f;
+  --red-soft: rgba(200, 80, 63, 0.14);
+  --green: #2f6b3d;
+  --green-soft: rgba(47, 107, 61, 0.12);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 36px rgba(35, 48, 31, 0.1);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 14px rgba(35, 48, 31, 0.07);
+
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius-xl);
   display: flex;
   flex-direction: column;
   gap: 24px;
@@ -132,7 +174,7 @@ function fmt(v) {
 }
 
 .accent-text {
-  color: var(--text-muted);
+  color: var(--accent-2);
   font-weight: 800;
 }
 
@@ -145,6 +187,60 @@ function fmt(v) {
 .hero-visual {
   position: relative;
   height: 300px;
+  border-radius: var(--radius-xl);
+  background: linear-gradient(155deg, var(--accent-soft), rgba(224, 181, 60, 0.16));
+  border: 1px solid var(--border-soft);
+  overflow: hidden;
+}
+
+.badge-cluster {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 22px;
+}
+
+.stat-badge {
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: var(--shadow);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  text-align: center;
+}
+
+.stat-badge-primary {
+  width: 152px;
+  height: 152px;
+  border: 3px solid var(--accent);
+}
+
+.stat-badge-secondary {
+  border: 3px solid var(--accent-2);
+  margin-top: 36px;
+}
+
+.stat-badge-value {
+  font-size: 24px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+.stat-badge-primary .stat-badge-value {
+  font-size: 28px;
+}
+
+.stat-badge-label {
+  font-size: 11px;
+  color: var(--text-muted);
+  font-weight: 600;
 }
 
 .floating-card {
@@ -182,10 +278,15 @@ function fmt(v) {
   border-radius: var(--radius-pill);
 }
 
+.floating-badge.warn {
+  color: var(--red);
+  background: var(--red-soft);
+}
+
 .progress-track {
   height: 8px;
   border-radius: var(--radius-pill);
-  background: var(--bg);
+  background: var(--surface-2);
   overflow: hidden;
 }
 

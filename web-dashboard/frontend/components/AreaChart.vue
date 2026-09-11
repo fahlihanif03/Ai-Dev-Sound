@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref } from "vue";
+import { computed, onUnmounted, ref, watch } from "vue";
 
 const props = defineProps({
   series: { type: Array, default: () => [] }, // [{t: epochMs, v: number}]
@@ -7,8 +7,9 @@ const props = defineProps({
   color: { type: String, default: "var(--accent)" },
 });
 
-const range = ref("1h"); // "1h" | "24h"
-const rangeMs = computed(() => (range.value === "1h" ? 3600_000 : 86_400_000));
+const range = ref("1h"); // "10m" | "1h" | "24h"
+const RANGE_MS = { "10m": 600_000, "1h": 3600_000, "24h": 86_400_000 };
+const rangeMs = computed(() => RANGE_MS[range.value]);
 
 const visible = computed(() => {
   const cutoff = Date.now() - rangeMs.value;
@@ -35,7 +36,37 @@ function niceStep(roughStep) {
 }
 
 const svgRef = ref(null);
+const chartShellRef = ref(null);
 const hoverIndex = ref(-1);
+
+// The SVG's viewBox is a fixed 640 units wide but the card it renders
+// into (and therefore each viewBox unit's real on-screen size) varies
+// with the page's responsive layout - a gap that reads fine on a wide
+// desktop card can be zero pixels on a narrow one. Tracking the real
+// rendered width lets the x-axis label spacing below convert a real
+// "labels need ~64px apart" rule into the right number of viewBox units
+// for whatever width this instance actually has.
+const renderedWidth = ref(width);
+let resizeObserver;
+// chart-shell only exists once there's data to plot (v-if="chartData.
+// linePath"), so it can mount well after this component's own onMounted
+// already ran - watching the template ref itself (rather than a one-shot
+// onMounted) means the observer attaches whenever that div first
+// actually appears, including if it wasn't there yet on first render.
+watch(
+  chartShellRef,
+  (el) => {
+    resizeObserver?.disconnect();
+    if (!el) return;
+    renderedWidth.value = el.clientWidth || width;
+    resizeObserver = new ResizeObserver(() => {
+      renderedWidth.value = el.clientWidth || width;
+    });
+    resizeObserver.observe(el);
+  },
+  { immediate: true },
+);
+onUnmounted(() => resizeObserver?.disconnect());
 
 const chartData = computed(() => {
   const pts = visible.value;
@@ -76,7 +107,64 @@ const chartData = computed(() => {
     yTicks.push({ v, y });
   }
 
-  return { linePath: line, areaPath: area, xy, pts, yTicks };
+  // Time-axis labels (HH:MM) - readings now arrive once a minute (see
+  // telemetry.c's *_SEND_INTERVAL_MS), so labeling by clock time rather
+  // than just showing the line is what actually makes the 1-per-minute
+  // cadence legible. Picked by index across the visible points rather
+  // than by even time spacing, since real readings aren't perfectly
+  // metronomic (retries, brief drops) - this still spreads labels evenly
+  // across the plotted width either way.
+  //
+  // One candidate tick per point, not a fixed cap - a short window (e.g.
+  // ~10 points at 1/minute) should get a label on every single point
+  // ("12:54, 12:55, 12:56, ..."), while a long window (a full "Last 24
+  // hours" at 1440 points) obviously can't. The gap-collision filtering
+  // right below is what actually decides how many of these survive to
+  // render, based on the card's real width - this just stops
+  // pre-emptively throwing away candidates a short/wide-enough window
+  // could actually fit.
+  const rawTickCount = xy.length - 1;
+  const rawXTicks = [];
+  for (let i = 0; i <= rawTickCount; i++) {
+    const idx = Math.round((i / rawTickCount) * (xy.length - 1));
+    rawXTicks.push({ x: xy[idx][0], t: pts[idx].t });
+  }
+
+  // Drop ticks that would render too close together to read (e.g. early
+  // on, with few points yet, several evenly-spaced-by-index ticks can
+  // round to nearly the same x and their "10:20 AM"-ish labels overlap
+  // into an unreadable smear). Always keep the last tick's position -
+  // pop the previous one instead if it's the one crowding it, so the
+  // range's actual end time is never the one that gets dropped.
+  // ~64 real screen px is roughly a "10:39 AM" label's width plus a
+  // little breathing room - converted from viewBox units (640 wide) to
+  // whatever this card's actual rendered width currently is, since a
+  // gap that's fine on a wide desktop card can be zero px on a narrow
+  // one (see renderedWidth above).
+  const minLabelGapPx = 64 * (width / renderedWidth.value);
+  const xTicks = [];
+  for (let i = 0; i < rawXTicks.length; i++) {
+    const tick = rawXTicks[i];
+    const isLast = i === rawXTicks.length - 1;
+    if (xTicks.length === 0) {
+      xTicks.push(tick);
+    } else if (tick.x - xTicks[xTicks.length - 1].x >= minLabelGapPx) {
+      xTicks.push(tick);
+    } else if (isLast) {
+      xTicks[xTicks.length - 1] = tick;
+    }
+  }
+
+  // Small unlabeled tick marks at every point - one per minute at the
+  // firmware's actual send cadence (see telemetry.c's *_SEND_INTERVAL_MS)
+  // - so the axis visibly reads as "every minute" even though most of
+  // those minutes don't get a text label (see xTicks above: labeling
+  // every single one would overlap into an unreadable smear at any
+  // realistic card width). This is the same label/gridline split the
+  // y-axis already uses - text where there's room, marks everywhere.
+  const xMinorTicks = xy.map(([x]) => x);
+
+  return { linePath: line, areaPath: area, xy, pts, yTicks, xTicks, xMinorTicks };
 });
 
 const hoverPoint = computed(() => {
@@ -115,12 +203,13 @@ function timeLabel(t) {
   <div class="area-chart">
     <div class="chart-toolbar">
       <div class="range-toggle">
+        <button :class="{ active: range === '10m' }" @click="range = '10m'">Last 10 min</button>
         <button :class="{ active: range === '1h' }" @click="range = '1h'">Last hour</button>
         <button :class="{ active: range === '24h' }" @click="range = '24h'">Last 24 hours</button>
       </div>
     </div>
 
-    <div v-if="chartData.linePath" class="chart-shell">
+    <div v-if="chartData.linePath" ref="chartShellRef" class="chart-shell">
       <!-- Y-axis labels as plain HTML, not SVG <text> - the SVG below uses
            preserveAspectRatio="none" so it can stretch to fill the card's
            width independently of its height; SVG text would visibly skew
@@ -161,11 +250,37 @@ function timeLabel(t) {
         <path :d="chartData.areaPath" fill="url(#areaFill)" stroke="none" />
         <path :d="chartData.linePath" fill="none" :stroke="color" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" />
 
+        <!-- One short unlabeled tick per reading (1/minute, see xMinorTicks
+             above) along the bottom edge - shows the axis's real per-minute
+             granularity even though only a few of those minutes get a text
+             label below (see .x-axis-label). -->
+        <line
+          v-for="x in chartData.xMinorTicks"
+          :key="`minor-${x}`"
+          :x1="x" :x2="x" :y1="height - padding" :y2="height - padding + 4"
+          class="minor-tick"
+        />
+
         <g v-if="hoverPoint">
           <line :x1="hoverPoint.x" :x2="hoverPoint.x" :y1="padding" :y2="height - padding" class="guide-line" />
           <circle :cx="hoverPoint.x" :cy="hoverPoint.y" r="4.5" :fill="color" class="guide-dot" />
         </g>
       </svg>
+
+      <!-- X-axis time labels, same plain-HTML-overlay approach as the
+           y-axis above (and for the same reason - SVG <text> would skew
+           under the SVG's non-uniform preserveAspectRatio scaling). First
+           and last labels anchor to their edge instead of centering so
+           they don't get clipped by the chart's edges. -->
+      <div class="x-axis">
+        <span
+          v-for="(tick, i) in chartData.xTicks"
+          :key="tick.x"
+          class="x-axis-label"
+          :class="{ 'align-start': i === 0, 'align-end': i === chartData.xTicks.length - 1 }"
+          :style="{ left: `${(tick.x / width) * 100}%` }"
+        >{{ timeLabel(tick.t) }}</span>
+      </div>
 
       <div
         v-if="hoverPoint"
@@ -245,6 +360,35 @@ function timeLabel(t) {
   stroke: var(--border-soft-2);
   stroke-width: 1;
   opacity: 0.6;
+}
+
+.minor-tick {
+  stroke: var(--border-soft-2);
+  stroke-width: 1;
+  opacity: 0.8;
+}
+
+.x-axis {
+  position: relative;
+  height: 16px;
+  margin-top: 2px;
+}
+
+.x-axis-label {
+  position: absolute;
+  transform: translateX(-50%);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-muted);
+  white-space: nowrap;
+}
+
+.x-axis-label.align-start {
+  transform: translateX(0);
+}
+
+.x-axis-label.align-end {
+  transform: translateX(-100%);
 }
 
 .chart-svg {

@@ -51,7 +51,11 @@ function toggle() {
   width: 38px;
   height: 21px;
   border-radius: var(--radius-pill);
-  background: rgba(255, 255, 255, 0.12);
+  /* var(--border-soft-2), not a hardcoded white rgba - the old hardcoded
+   * value assumed a dark surface behind it (barely visible, which was the
+   * point against near-black cards) and nearly disappeared once light-
+   * themed pages (e.g. Energy Monitoring) put this on a white card. */
+  background: var(--border-soft-2);
   position: relative;
   transition: background 0.2s ease;
   flex-shrink: 0;

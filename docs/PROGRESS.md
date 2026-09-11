@@ -6,6 +6,87 @@ the pieces fit together, this file is just the timeline.
 
 ---
 
+## 2026-09-11 — Root-caused sustained WiFi hangs, added self-recovery watchdog, per-minute chart axis, light theme
+
+**WiFi sustained-hang investigation, finally root-caused with live UART
+evidence** (`thermal-monitor-fw`): the board would periodically stop
+reaching the dashboard for minutes at a stretch, previously only clearable
+by a physical power cycle. Systematically ruled out, each with real
+evidence rather than guesses: bandwidth (traffic is ~4-5 kbps, trivial),
+iOS-hotspot throttling (confirmed the network is a real router, not a
+phone hotspot), MCU deep sleep (already locked out, didn't fix it), task
+starvation (lwIP's thread runs at a higher FreeRTOS priority than every
+app task), and this PC's own firewall/network/server (all confirmed
+healthy throughout every incident via `netstat`, `Get-NetFirewallRule`,
+`Get-NetConnectionProfile`, and `curl`). Along the way, found the earlier
+session's WiFi radio power-save "fix" had been silently failing every
+single time — `cy_wcm_allow_low_power_mode()` only actually acts on chip
+IDs 43909/43907/54907, and this board's CYW4343W isn't one of them, so it
+always returned `CY_RSLT_WCM_POWERSAVE_MODE_NOT_SUPPORTED` and did
+nothing. Fixed by bypassing that gated wrapper and calling
+`whd_wifi_disable_powersave()` directly via `cy_wcm_get_whd_interface()`
+(neither declared in `cy_wcm.h`, despite having ordinary external linkage)
+- confirmed genuinely applying via UART (`WiFi: radio power-save
+disabled`, no error) - but the hang pattern persisted even with that
+actually fixed, ruling out radio power-save as the (sole) cause too.
+Conclusion: this is a low-level CYW4343W radio/driver wedge - `cy_wcm`
+still believes it's associated (no `CY_WCM_EVENT_DISCONNECTED` ever
+fires) but `cy_http_client_connect()` fails repeatedly
+(`CY_RSLT_HTTP_CLIENT_ERROR`, generic) - a known category of issue with
+this chip, not something fixable from application code.
+
+**Self-recovery watchdog added** (`wifi/telemetry.c`) since the actual
+root cause isn't fixable in firmware: if telemetry can't connect for a
+stretch, force a full `NVIC_SystemReset()` - the same recovery a manual
+power cycle provides, just automatic. Started at 4 minutes, confirmed
+working live across many real hang cycles (`Telemetry: no successful
+connection in over Ns - WiFi radio likely wedged, forcing a full reset to
+recover`), then reduced to 2 minutes to halve the per-cycle downtime.
+
+**Telemetry send interval** changed from 2s/1s (audio/temp) to 1 minute
+for both, to match the dashboard's coarser chart granularity.
+
+**Dashboard `REAL_DATA_GRACE_MS` bug**: had been left equal to the new
+60s send interval, so any normal network jitter on a single send raced
+the "mark offline" threshold and flashed a false offline state on a board
+that was actually fine. Raised to 150s for real headroom.
+
+**Chart axis work** (`AreaChart.vue`): added an x-axis with real clock-
+time labels (previously only the y-axis had labels), a small tick mark
+per actual reading (1/minute) so the axis visibly reads as per-minute
+even where only some minutes get a text label, collision-avoidance so
+labels don't overlap (converts a real ~64px screen-space gap into the
+right number of viewBox units for whatever width the card is actually
+rendered at, via a `ResizeObserver`), and a new "Last 10 min" range
+option so a short window can show a label on every single minute.
+
+**Increased history retention** (`dashboard-do.ts`): `MAX_HISTORY_POINTS`
+300 → 1440 so "Last 24 hours" actually holds 24h of real per-minute
+readings instead of truncating at ~5h.
+
+**Light theme redesign** for both dashboard pages, following a supplied
+reference (cream background, white cards, deep green + gold accents,
+replacing the app's usual dark/near-black + orange theme): implemented as
+a `<style scoped>` var(--x) override on each page's root element rather
+than touching any shared component - every component already read the
+same custom-property names, so overriding them once per page reskins the
+whole subtree for free (CSS custom properties cascade through the DOM
+regardless of Vue component boundaries). Removed all Three.js code from
+Energy Monitoring (`ThreeHero.vue` deleted - it was only used there;
+`three` itself stays as a dependency since Predictive Maintenance's
+`PCViewer.vue` still needs it), replaced with a flat circular-badge hero
+visual. Predictive Maintenance's 3D PC viewer deliberately kept on its
+original dark "stage" backdrop (its lighting is tuned for that) rather
+than inverted to light, matching the same "hero panel stays a distinct
+accent panel" treatment Energy Monitoring's own hero got. Fixed two real
+bugs surfaced by testing on a light background: `PowerToggle`'s off-state
+track was a hardcoded barely-visible white overlay (fine on near-black
+cards, invisible on white ones) - now uses the themed
+`--border-soft-2` token; the card-pulse glow animation was hardcoded to
+the old orange accent - now follows whatever `--accent` the page defines.
+
+---
+
 ## 2026-09-09 (latest of all) — Spectrogram freeze bug, deep-sleep lockout fix, live connectivity monitor
 
 **Real bug found and fixed**: `Spectrogram.vue` watched `history.length` to

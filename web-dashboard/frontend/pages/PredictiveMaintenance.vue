@@ -175,7 +175,42 @@ function onCaseSelect() {
 </template>
 
 <style scoped>
+/* Light theme, scoped to this page only - same technique and palette as
+ * Energy Monitoring (see that page's own style block for the full
+ * rationale): every component below reads these same var(--x) names, so
+ * overriding them here is enough to reskin the whole subtree without
+ * touching any component file. Deliberately NOT overriding --stage/
+ * --stage-2 here - those stay the dark tokens from the shared root theme,
+ * so the PC model keeps its dramatic dark "stage" backdrop (its lighting
+ * is tuned for that) even though everything around it is now light,
+ * mirroring how Energy Monitoring's own hero panel stays a distinct
+ * accent-colored panel rather than plain white. */
 .page {
+  --bg: #fbf3da;
+  --surface: #ffffff;
+  --surface-2: #f4ecd4;
+  --border-soft: rgba(31, 46, 26, 0.08);
+  --border-soft-2: rgba(31, 46, 26, 0.14);
+  --text: #23301f;
+  --text-muted: #71806b;
+  --text-faint: #a3ac9a;
+  --accent: #2f6b3d;
+  --accent-2: #e0b53c;
+  --accent-soft: rgba(47, 107, 61, 0.12);
+  --accent-grad: linear-gradient(90deg, #2f6b3d, #e0b53c);
+  --accent-rgb: 47, 107, 61;
+  --amber: #c98a1f;
+  --amber-soft: rgba(201, 138, 31, 0.16);
+  --red: #c8503f;
+  --red-soft: rgba(200, 80, 63, 0.14);
+  --green: #2f6b3d;
+  --green-soft: rgba(47, 107, 61, 0.12);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 36px rgba(35, 48, 31, 0.1);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 14px rgba(35, 48, 31, 0.07);
+
+  background: var(--bg);
+  color: var(--text);
+  border-radius: var(--radius-xl);
   display: flex;
   flex-direction: column;
   gap: 18px;
@@ -248,9 +283,12 @@ function onCaseSelect() {
 }
 
 @keyframes card-pulse {
-  0% { box-shadow: 0 0 0 0 rgba(255, 106, 26, 0.4); }
-  60% { box-shadow: 0 0 0 10px rgba(255, 106, 26, 0); }
-  100% { box-shadow: 0 0 0 0 rgba(255, 106, 26, 0); }
+  /* rgba(var(--accent-rgb)), not a hardcoded orange triplet - this page
+   * now runs a green/gold light theme (see .page above), and the old
+   * hardcoded orange no longer matches --accent. */
+  0% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0.4); }
+  60% { box-shadow: 0 0 0 10px rgba(var(--accent-rgb), 0); }
+  100% { box-shadow: 0 0 0 0 rgba(var(--accent-rgb), 0); }
 }
 
 .signal-card {

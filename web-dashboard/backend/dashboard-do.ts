@@ -51,8 +51,24 @@ const SOUND_TICK_MS = 1000;
 const TEMP_TICK_MS = 1000;
 const ALARM_RESOLUTION_MS = Math.min(TICK_MS, SOUND_TICK_MS, TEMP_TICK_MS); // how often the single alarm actually has to wake up to serve the fastest channel
 const IDLE_TICK_MS = 30_000; // alarm interval while no dashboard is connected - just checks back for reconnects
-const MAX_HISTORY_POINTS = 300; // per channel, in memory - short recent window only, per PRD non-goals
-const REAL_DATA_GRACE_MS = 60_000;
+// 1440 = 24h worth of real readings at the firmware's 1-reading/minute
+// cadence (see wifi/telemetry.c's AUDIO_SEND_INTERVAL_MS/
+// TEMP_SEND_INTERVAL_MS) - raised from 300 (5h) so the dashboard's "Last
+// 24 hours" range toggle (see AreaChart.vue) actually has 24h of real
+// data to show instead of silently truncating to whatever the cap
+// allowed. Note this is real-data-only math: the simulator (SOUND_TICK_MS/
+// TEMP_TICK_MS, used only when no board has ever sent real data for a
+// channel) still ticks once a second, so demo-mode history only spans
+// ~24 simulated minutes - a pre-existing simulator/real-cadence mismatch,
+// unrelated to this change.
+const MAX_HISTORY_POINTS = 1440; // per channel, in memory
+// Must stay comfortably above the firmware's own send interval (60s, see
+// wifi/telemetry.c's AUDIO_SEND_INTERVAL_MS/TEMP_SEND_INTERVAL_MS) - a
+// grace period equal to the send interval races normal network jitter
+// (one slightly slow POST is enough to trip it) and flashes "offline" on
+// a board that never actually stopped sending. 2.5x gives room for a
+// couple of missed/delayed sends before actually flagging it.
+const REAL_DATA_GRACE_MS = 150_000;
 const SQL_PRUNE_EVERY_N_WRITES = 300; // batches SQL cleanup instead of doing it every write
 
 const CHANNELS: Channel[] = ["sound", "temperature", "power"];
