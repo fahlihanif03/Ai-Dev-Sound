@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, onMounted, onUnmounted } from "vue";
-import { state } from "../lib/live-state.js";
+import { useLiveStore } from "../stores/live.js";
 
+const live = useLiveStore();
 const now = ref(new Date());
 let timer;
 onMounted(() => {
@@ -43,9 +44,9 @@ const dateTimeLabel = computed(() =>
 
     <div class="right-cluster">
       <span class="datetime">{{ dateTimeLabel }}</span>
-      <span class="conn" :class="{ online: state.connected }">
+      <span class="conn" :class="{ online: live.state.connected }">
         <span class="dot"></span>
-        {{ state.connected ? "Online" : "Offline" }}
+        {{ live.state.connected ? "Online" : "Offline" }}
       </span>
       <button class="icon-btn" type="button" aria-label="Notifications">
         <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8">

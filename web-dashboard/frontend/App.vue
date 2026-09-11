@@ -1,9 +1,10 @@
 <script setup>
 import { onMounted } from "vue";
 import TopNav from "./components/TopNav.vue";
-import { connectLiveState } from "./lib/live-state.js";
+import { useLiveStore } from "./stores/live.js";
 
-onMounted(connectLiveState);
+const live = useLiveStore();
+onMounted(live.connect);
 </script>
 
 <template>

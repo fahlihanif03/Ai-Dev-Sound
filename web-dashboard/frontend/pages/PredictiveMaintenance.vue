@@ -1,6 +1,6 @@
 <script setup>
 import { computed, ref } from "vue";
-import { state } from "../lib/live-state.js";
+import { useLiveStore } from "../stores/live.js";
 import PCViewer from "../components/PCViewer.vue";
 import StatusBadge from "../components/StatusBadge.vue";
 import Spectrogram from "../components/Spectrogram.vue";
@@ -9,8 +9,9 @@ import AreaChart from "../components/AreaChart.vue";
 import AlertBanner from "../components/AlertBanner.vue";
 import PowerToggle from "../components/PowerToggle.vue";
 
-const sound = computed(() => state.sound);
-const temperature = computed(() => state.temperature);
+const live = useLiveStore();
+const sound = computed(() => live.state.sound);
+const temperature = computed(() => live.state.temperature);
 
 /* Board / per-signal power toggles. These are display-layer only: the
  * bridge scripts and firmware keep running and reporting regardless -

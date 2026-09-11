@@ -1,3 +1,5 @@
+@import "tailwindcss";
+
 /* Light theme - blue-gray page background, white cards, single orange
    accent, near-black nav/primary text, matching the SUING-style
    reference. Every component reads these same var(--x) names (no

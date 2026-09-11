@@ -94,7 +94,7 @@ onMounted(() => {
 });
 onUnmounted(() => resizeObserver?.disconnect());
 
-// Watches the array reference, not its length - live-state.js replaces
+// Watches the array reference, not its length - the live store replaces
 // `history` with a fresh array on every WebSocket update regardless of
 // whether its length actually changed (see the comment on appendColumns()).
 watch(() => props.history, appendColumns);

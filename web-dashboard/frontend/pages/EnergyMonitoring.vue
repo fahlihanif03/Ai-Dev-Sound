@@ -1,14 +1,15 @@
 <script setup>
 import { computed } from "vue";
-import { state } from "../lib/live-state.js";
+import { useLiveStore } from "../stores/live.js";
 import KpiCard from "../components/KpiCard.vue";
 import AreaChart from "../components/AreaChart.vue";
 import AlertBanner from "../components/AlertBanner.vue";
 import RingGauge from "../components/RingGauge.vue";
-import ArcGauge from "../components/ArcGauge.vue";
+import NeedleGauge from "../components/NeedleGauge.vue";
 import DotGrid from "../components/DotGrid.vue";
 
-const power = computed(() => state.power);
+const live = useLiveStore();
+const power = computed(() => live.state.power);
 const overallOk = computed(() => power.value.flag !== "abnormal");
 const lastUpdate = computed(() => power.value.history.at(-1)?.t ?? 0);
 
@@ -39,6 +40,39 @@ const currentRatio = computed(() => Math.max(0, Math.min(1, (power.value.extra?.
 function fmt(v) {
   return typeof v === "number" ? v.toFixed(2) : "--";
 }
+
+/* Real derived stats for the KPI strip below - not fabricated. Peak is a
+ * genuine max() over whatever history is currently loaded (so it moves
+ * as the window grows, same honesty rule as everything else this app
+ * shows: no invented cost/CO2/billing figures the board doesn't measure). */
+const peakPower = computed(() => {
+  const h = power.value.history;
+  return h.length ? Math.max(...h.map((p) => p.v ?? 0)) : null;
+});
+
+/* Real % change vs the immediately previous reading. Voltage/current
+ * don't get a delta - the backend only stores {t, v} per history point
+ * (see dashboard-do.ts's historyMem), not per-point voltage/current, so
+ * there's no real history to compare those two against - showing a fake
+ * delta for them would mean making up a number, which this app doesn't
+ * do anywhere else either. */
+const powerDelta = computed(() => {
+  const h = power.value.history;
+  if (h.length < 2) return null;
+  const prev = h[h.length - 2].v;
+  const curr = h[h.length - 1].v;
+  if (!prev) return null;
+  return ((curr - prev) / prev) * 100;
+});
+
+/* Simple, real-threshold-based read of the power factor value - not a
+ * fabricated score, just a plain-language label for the number already
+ * shown next to it. */
+const powerQualityLabel = computed(() => {
+  if (pf.value >= 0.95) return "Excellent";
+  if (pf.value >= 0.85) return "Good";
+  return "Needs improvement";
+});
 </script>
 
 <template>
@@ -48,6 +82,59 @@ function fmt(v) {
       :updated-at="lastUpdate"
       message="Power reading is outside the normal range - check the connected load."
     />
+
+    <!-- New KPI strip, built with Tailwind utility classes (see
+         stores/live.js's migration note on why the rest of this page's
+         existing cards keep their scoped CSS rather than being rewritten
+         wholesale). All four values are real board readings or values
+         genuinely derived from them - no fabricated cost/CO2 figures. -->
+    <section class="grid grid-cols-2 gap-4 md:grid-cols-4">
+      <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-[13px] font-medium text-[var(--text-muted)]">Current Power</span>
+          <span class="text-xl font-extrabold tracking-tight">{{ fmt(power.value) }} <small class="text-xs font-semibold text-[var(--text-muted)]">kW</small></span>
+          <span v-if="powerDelta !== null" class="text-xs font-semibold" :class="powerDelta <= 0 ? 'text-[var(--green)]' : 'text-[var(--red)]'">
+            {{ powerDelta <= 0 ? "↓" : "↑" }} {{ Math.abs(powerDelta).toFixed(1) }}%
+          </span>
+        </div>
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M13 2 5 13h6l-1 9 9-13h-6z" /></svg>
+        </span>
+      </div>
+
+      <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-[13px] font-medium text-[var(--text-muted)]">Peak Power</span>
+          <span class="text-xl font-extrabold tracking-tight">{{ fmt(peakPower) }} <small class="text-xs font-semibold text-[var(--text-muted)]">kW</small></span>
+          <span class="text-xs font-semibold text-[var(--text-faint)]">this window</span>
+        </div>
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 17 9 11l4 4 8-8" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </span>
+      </div>
+
+      <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-[13px] font-medium text-[var(--text-muted)]">Voltage</span>
+          <span class="text-xl font-extrabold tracking-tight">{{ fmt(power.extra.voltage) }} <small class="text-xs font-semibold text-[var(--text-muted)]">V</small></span>
+          <span class="text-xs font-semibold text-[var(--text-faint)]">live reading</span>
+        </div>
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 3" stroke-linecap="round" /></svg>
+        </span>
+      </div>
+
+      <div class="flex items-center justify-between rounded-2xl bg-white p-5 shadow-sm">
+        <div class="flex flex-col gap-1">
+          <span class="text-[13px] font-medium text-[var(--text-muted)]">Current</span>
+          <span class="text-xl font-extrabold tracking-tight">{{ fmt(power.extra.current) }} <small class="text-xs font-semibold text-[var(--text-muted)]">A</small></span>
+          <span class="text-xs font-semibold text-[var(--text-faint)]">live reading</span>
+        </div>
+        <span class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-[var(--accent-soft)] text-[var(--accent)]">
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2 5 13h6l-1 9 9-13h-6z" stroke-linecap="round" stroke-linejoin="round" /></svg>
+        </span>
+      </div>
+    </section>
 
     <section class="top-grid">
       <div class="hero-panel">
@@ -73,9 +160,14 @@ function fmt(v) {
         </section>
 
         <div class="small-grid">
-          <KpiCard label="Power factor" :value="pf.toFixed(2)" unit="">
-            <ArcGauge :ratio="pf" :percent-label="pf.toFixed(2)" :value-label="`${fmt(power.value)} kW`" />
-          </KpiCard>
+          <!-- Tailwind, not scoped CSS - see the KPI strip's own comment
+               above for why. -->
+          <div class="flex flex-col items-center gap-1 rounded-2xl bg-white p-5 shadow-sm">
+            <span class="self-start text-[13px] font-medium text-[var(--text-muted)]">Power Quality</span>
+            <NeedleGauge :ratio="pf" />
+            <span class="text-xl font-extrabold tracking-tight">{{ pf.toFixed(3) }}</span>
+            <span class="text-xs font-semibold" :class="pf >= 0.95 ? 'text-[var(--green)]' : pf >= 0.85 ? 'text-[var(--accent)]' : 'text-[var(--red)]'">{{ powerQualityLabel }}</span>
+          </div>
 
           <KpiCard label="Load trend" :value="`${loadPercent}%`" unit="">
             <DotGrid :values="powerBars" />
