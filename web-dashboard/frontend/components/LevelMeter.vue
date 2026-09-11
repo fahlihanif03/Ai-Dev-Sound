@@ -32,74 +32,20 @@ const barTrail = computed(() => {
 </script>
 
 <template>
-  <div class="level-meter">
-    <div class="level-readout">
-      <span class="level-value">{{ currentDb.toFixed(0) }}</span>
-      <span class="level-unit">dB (scaled)</span>
+  <div class="flex flex-col gap-2">
+    <div class="flex items-baseline gap-1.5">
+      <span class="text-[22px] font-extrabold">{{ currentDb.toFixed(0) }}</span>
+      <span class="text-[11px] text-[var(--text-muted)]">dB (scaled)</span>
     </div>
-    <div class="bars">
+    <div class="flex h-14 items-end gap-[3px] rounded-[10px] bg-[var(--stage)] px-2 py-1.5">
       <span
         v-for="(db, i) in barTrail"
         :key="i"
-        class="bar"
-        :class="{ hot: db > 70, warm: db > 45 && db <= 70 }"
+        class="min-h-1 flex-1 rounded-sm"
+        :class="db > 70 ? 'bg-[var(--accent)]' : db > 45 ? 'bg-[var(--accent-2)]' : 'bg-[#4a4d54]'"
         :style="{ height: Math.max(4, db) + '%' }"
       ></span>
     </div>
-    <span class="level-caption">Scaled from the anomaly score, not a calibrated SPL reading</span>
+    <span class="text-[10.5px] text-[var(--text-muted)]">Scaled from the anomaly score, not a calibrated SPL reading</span>
   </div>
 </template>
-
-<style scoped>
-.level-meter {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-}
-
-.level-readout {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-}
-
-.level-value {
-  font-size: 22px;
-  font-weight: 800;
-}
-
-.level-unit {
-  font-size: 11px;
-  color: var(--text-muted);
-}
-
-.bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 3px;
-  height: 56px;
-  background: var(--stage);
-  border-radius: 10px;
-  padding: 6px 8px;
-}
-
-.bar {
-  flex: 1;
-  min-height: 4px;
-  border-radius: 2px;
-  background: #4a4d54;
-}
-
-.bar.warm {
-  background: var(--accent-2);
-}
-
-.bar.hot {
-  background: var(--accent);
-}
-
-.level-caption {
-  font-size: 10.5px;
-  color: var(--text-muted);
-}
-</style>

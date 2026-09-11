@@ -15,7 +15,7 @@ const seg2 = computed(() => circumference - seg1.value);
 </script>
 
 <template>
-  <svg :width="size" :height="size" :viewBox="`0 0 ${size} ${size}`" class="donut">
+  <svg :width="size" :height="size" :viewBox="`0 0 ${size} ${size}`" class="block">
     <circle
       :cx="size / 2" :cy="size / 2" :r="r"
       fill="none" stroke="var(--accent-2)" :stroke-width="stroke"
@@ -33,9 +33,3 @@ const seg2 = computed(() => circumference - seg1.value);
     />
   </svg>
 </template>
-
-<style scoped>
-.donut {
-  display: block;
-}
-</style>

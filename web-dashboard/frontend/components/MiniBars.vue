@@ -15,27 +15,13 @@ const bars = computed(() => {
 </script>
 
 <template>
-  <div class="mini-bars">
-    <span v-for="(b, i) in bars" :key="i" class="bar" :class="{ active: b.active }" :style="{ height: b.h + '%' }"></span>
+  <div class="flex h-11 items-end gap-1">
+    <span
+      v-for="(b, i) in bars"
+      :key="i"
+      class="min-w-[3px] flex-1 rounded"
+      :class="b.active ? 'bg-[image:var(--accent-grad)]' : 'bg-[var(--border-soft)]'"
+      :style="{ height: b.h + '%' }"
+    ></span>
   </div>
 </template>
-
-<style scoped>
-.mini-bars {
-  display: flex;
-  align-items: flex-end;
-  gap: 4px;
-  height: 44px;
-}
-
-.bar {
-  flex: 1;
-  min-width: 3px;
-  border-radius: 4px;
-  background: var(--border-soft);
-}
-
-.bar.active {
-  background: var(--accent-grad);
-}
-</style>

@@ -19,37 +19,14 @@ const columns = computed(() => {
 </script>
 
 <template>
-  <div class="dot-grid">
-    <div v-for="(col, ci) in columns" :key="ci" class="dot-col">
-      <span v-for="(lit, ri) in col" :key="ri" class="dot" :class="{ lit }"></span>
+  <div class="flex h-11 items-end gap-[5px]">
+    <div v-for="(col, ci) in columns" :key="ci" class="flex flex-1 flex-col-reverse gap-[3px]">
+      <span
+        v-for="(lit, ri) in col"
+        :key="ri"
+        class="aspect-square w-full min-w-[3px] rounded-full"
+        :class="lit ? 'bg-[var(--accent-2)]' : 'bg-[var(--border-soft-2)]'"
+      ></span>
     </div>
   </div>
 </template>
-
-<style scoped>
-.dot-grid {
-  display: flex;
-  align-items: flex-end;
-  gap: 5px;
-  height: 44px;
-}
-
-.dot-col {
-  display: flex;
-  flex-direction: column-reverse;
-  gap: 3px;
-  flex: 1;
-}
-
-.dot {
-  width: 100%;
-  aspect-ratio: 1;
-  min-width: 3px;
-  border-radius: 50%;
-  background: var(--border-soft-2);
-}
-
-.dot.lit {
-  background: var(--accent-2);
-}
-</style>

@@ -15,6 +15,12 @@ const props = defineProps({
 
 const label = computed(() => (props.offline ? "Offline" : props.flag === "abnormal" ? "Attention" : "Normal"));
 
+const colorClasses = computed(() => {
+  if (props.offline) return "bg-[var(--surface-2)] text-[var(--text-muted)]";
+  if (props.flag === "abnormal") return "bg-[var(--amber-soft)] text-[var(--amber)]";
+  return "bg-[var(--accent-soft)] text-[var(--accent)]";
+});
+
 function fmt(v) {
   return typeof v === "number" ? v.toFixed(2) : v;
 }
@@ -22,44 +28,11 @@ function fmt(v) {
 
 <template>
   <span
-    class="badge"
-    :class="offline ? 'offline' : flag"
+    class="inline-flex cursor-default items-center gap-1.5 rounded-[var(--radius-pill)] px-3 py-[5px] text-xs font-semibold tracking-[0.01em]"
+    :class="colorClasses"
     :title="!offline && threshold !== null ? `Reading: ${fmt(value)}${unit} · Threshold: ${fmt(threshold)}${unit}` : offline ? 'No data received recently - showing the last known reading' : ''"
   >
-    <span class="dot"></span>
+    <span class="h-1.5 w-1.5 rounded-full bg-current"></span>
     {{ label }}
   </span>
 </template>
-
-<style scoped>
-.badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  padding: 5px 12px;
-  border-radius: var(--radius-pill);
-  font-size: 12px;
-  font-weight: 600;
-  letter-spacing: 0.01em;
-  cursor: default;
-  background: var(--accent-soft);
-  color: var(--accent);
-}
-
-.badge.abnormal {
-  background: var(--amber-soft);
-  color: var(--amber);
-}
-
-.badge.offline {
-  background: var(--surface-2);
-  color: var(--text-muted);
-}
-
-.dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-</style>

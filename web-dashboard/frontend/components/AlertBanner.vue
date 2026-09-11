@@ -22,54 +22,26 @@ watch(
 
 <template>
   <Transition name="fade">
-    <div v-if="active && !dismissed" class="alert-strip" role="alert">
-      <span class="alert-dot"></span>
-      <span class="alert-text">{{ message }}</span>
-      <button class="dismiss" aria-label="Dismiss" @click="dismissed = true">&times;</button>
+    <div
+      v-if="active && !dismissed"
+      class="flex items-center gap-2.5 rounded-[var(--radius-md)] bg-[var(--amber-soft)] px-4.5 py-3 text-[13px] font-medium text-[var(--amber)]"
+      role="alert"
+    >
+      <span class="h-1.5 w-1.5 shrink-0 rounded-full bg-current"></span>
+      <span class="flex-1">{{ message }}</span>
+      <button
+        class="cursor-pointer border-none bg-transparent px-1 py-0.5 text-base leading-none text-current opacity-70 hover:opacity-100"
+        aria-label="Dismiss"
+        @click="dismissed = true"
+      >&times;</button>
     </div>
   </Transition>
 </template>
 
 <style scoped>
-.alert-strip {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 12px 18px;
-  border-radius: var(--radius-md);
-  background: var(--amber-soft);
-  color: var(--amber);
-  font-size: 13px;
-  font-weight: 500;
-}
-
-.alert-dot {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: currentColor;
-  flex-shrink: 0;
-}
-
-.alert-text {
-  flex: 1;
-}
-
-.dismiss {
-  border: none;
-  background: transparent;
-  color: currentColor;
-  font-size: 16px;
-  line-height: 1;
-  cursor: pointer;
-  padding: 2px 4px;
-  opacity: 0.7;
-}
-
-.dismiss:hover {
-  opacity: 1;
-}
-
+/* Vue's <Transition name="fade"> needs actual named CSS classes to hook
+ * into - not expressible as inline utility classes on the elements
+ * themselves, so this is the one bit that has to stay real CSS. */
 .fade-enter-active,
 .fade-leave-active {
   transition: opacity 0.2s ease;

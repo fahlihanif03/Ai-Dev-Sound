@@ -38,11 +38,21 @@ const ticks = computed(() => {
   }
   return out;
 });
+
+// The glow needs a runtime color (the `color` prop), which color-mix()
+// can't take from a Tailwind class - computed here and applied via
+// :style instead, same effect as the old scoped-CSS ".ring-center.glow"
+// rule, just without needing a <style> block for one dynamic value.
+const glowStyle = computed(() =>
+  props.glow
+    ? { background: `radial-gradient(circle, color-mix(in srgb, ${props.color} 22%, transparent) 0%, transparent 72%)` }
+    : null
+);
 </script>
 
 <template>
-  <div class="ring-gauge" :style="{ width: `${size + 20}px`, height: `${size + 20}px` }">
-    <svg :viewBox="`0 0 ${size} ${size}`" :width="size" :height="size" class="ring-svg">
+  <div class="relative flex items-center justify-center" :style="{ width: `${size + 20}px`, height: `${size + 20}px` }">
+    <svg :viewBox="`0 0 ${size} ${size}`" :width="size" :height="size" class="overflow-visible">
       <circle :cx="size / 2" :cy="size / 2" :r="r" fill="none" :stroke="track" :stroke-width="stroke" />
       <circle
         :cx="size / 2" :cy="size / 2" :r="r" fill="none" :stroke="color" :stroke-width="stroke"
@@ -50,60 +60,16 @@ const ticks = computed(() => {
         stroke-linecap="round"
         :transform="`rotate(-90 ${size / 2} ${size / 2})`"
       />
-      <line v-for="(t, i) in ticks" :key="i" :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2" :class="['tick', { lit: t.lit }]" />
+      <line
+        v-for="(t, i) in ticks" :key="i"
+        :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2"
+        :stroke="t.lit ? 'var(--accent-2)' : 'var(--border-soft-2)'"
+        stroke-width="1.6"
+      />
     </svg>
-    <div class="ring-center" :class="{ glow }" :style="glow ? { '--glow-color': color } : null">
-      <span class="ring-value">{{ value }}</span>
-      <span v-if="unit" class="ring-unit">{{ unit }}</span>
+    <div class="absolute inset-0 flex flex-col items-center justify-center gap-px rounded-full" :style="glowStyle">
+      <span class="text-[22px] font-extrabold tracking-[-0.02em]">{{ value }}</span>
+      <span v-if="unit" class="text-[11px] font-semibold text-[var(--text-muted)]">{{ unit }}</span>
     </div>
   </div>
 </template>
-
-<style scoped>
-.ring-gauge {
-  position: relative;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.ring-svg {
-  overflow: visible;
-}
-
-.tick {
-  stroke: var(--border-soft-2);
-  stroke-width: 1.6;
-}
-
-.tick.lit {
-  stroke: var(--accent-2);
-}
-
-.ring-center {
-  position: absolute;
-  inset: 0;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  border-radius: 50%;
-}
-
-.ring-center.glow {
-  background: radial-gradient(circle, color-mix(in srgb, var(--glow-color) 22%, transparent) 0%, transparent 72%);
-}
-
-.ring-value {
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.02em;
-}
-
-.ring-unit {
-  font-size: 11px;
-  color: var(--text-muted);
-  font-weight: 600;
-}
-</style>
