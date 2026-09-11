@@ -321,7 +321,7 @@ const powerQualityLabel = computed(() => {
  * dark ground, unlike the rest of the (light-themed) page. */
 .hero-panel {
   background:
-    radial-gradient(circle at 82% 18%, rgba(245, 166, 35, 0.55), transparent 55%),
+    radial-gradient(circle at 82% 18%, rgba(var(--accent-rgb), 0.55), transparent 55%),
     linear-gradient(155deg, #23262b, #15171a 70%);
   border-radius: var(--radius-xl);
   padding: 22px;

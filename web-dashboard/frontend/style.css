@@ -1,31 +1,34 @@
 @import "tailwindcss";
 
-/* Light theme - blue-gray page background, white cards, single orange
-   accent, near-black nav/primary text, matching the SUING-style
-   reference. Every component reads these same var(--x) names (no
-   hardcoded colors), so this single swap reskins the whole app.
-   Status colors (amber/red/green - "Attention", "Offline", etc.) stay
-   their own distinct hues rather than folding into the single orange
-   accent - the reference's own "single accent" idea is about decorative
-   chart/gauge color, not about flattening alert semantics into ambiguity. */
+/* Light theme - warm cream page background, white cards, orange-to-gold
+   accent gradient, matching the Solvex-style reference (a solar-app
+   mockup - re-themed here as color/card language only, not literally
+   rebuilt as a mobile app: no bottom tab bar, no fabricated solar/
+   revenue metrics, no stock photo of a person as the avatar - this is
+   still the same desktop dashboard with real board data underneath).
+   Every component reads these same var(--x) names (no hardcoded
+   colors), so this single swap reskins the whole app. Status colors
+   (amber/red/green - "Attention", "Offline", etc.) stay their own
+   distinct hues rather than folding into the single accent - the
+   reference's own "single accent" idea is about decorative chart/gauge
+   color, not about flattening alert semantics into ambiguity. */
 :root {
-  --page-bg: #b8c9d3;
+  --page-bg: #f3e9dd;
   --bg: transparent;
   --bg-glow: none;
   --surface: #ffffff;
   --surface-tint: #fffdf5;
-  --surface-2: #eef1f3;
-  --border-soft: rgba(20, 24, 28, 0.08);
-  --border-soft-2: rgba(20, 24, 28, 0.14);
-  --text: #16181a;
-  --text-muted: #667085;
-  --text-faint: #9aa3ab;
-  --accent: #f5a623;
-  --accent-2: #ffcb6b;
-  --accent-soft: rgba(245, 166, 35, 0.14);
-  --accent-grad: linear-gradient(90deg, #f5a623, #ffcb6b);
-  --accent-rgb: 245, 166, 35;
-  --nav-active: #16181a;
+  --surface-2: #f7f0e6;
+  --border-soft: rgba(40, 28, 16, 0.07);
+  --border-soft-2: rgba(40, 28, 16, 0.13);
+  --text: #221a12;
+  --text-muted: #7a6f62;
+  --text-faint: #ab9f8f;
+  --accent: #f2711f;
+  --accent-2: #ffb347;
+  --accent-soft: rgba(242, 113, 31, 0.14);
+  --accent-grad: linear-gradient(90deg, #f2711f, #ffb347);
+  --accent-rgb: 242, 113, 31;
   --amber: #c98a1f;
   --amber-soft: rgba(201, 138, 31, 0.16);
   --red: #d9534f;
@@ -37,8 +40,8 @@
      so this pair stays dark even though the rest of the theme is light. */
   --stage: #0c0d0f;
   --stage-2: #1a1b1e;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 36px rgba(20, 24, 28, 0.12);
-  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 14px rgba(20, 24, 28, 0.08);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 36px rgba(40, 28, 16, 0.1);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 14px rgba(40, 28, 16, 0.07);
   --radius-xl: 24px;
   --radius-lg: 18px;
   --radius-md: 12px;
