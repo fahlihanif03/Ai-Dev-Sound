@@ -10,6 +10,12 @@ const props = defineProps({
   unit: { type: String, default: "" },
   color: { type: String, default: "var(--accent)" },
   tickCount: { type: Number, default: 24 },
+  // Darker track for a dial sitting on a white card (the default light
+  // track is for a gauge sitting on a colored/gradient hero panel, where
+  // a dark track would look muddy instead of legible).
+  track: { type: String, default: "var(--border-soft-2)" },
+  // Soft radial glow behind the center value, like a lit gauge hub.
+  glow: { type: Boolean, default: false },
 });
 
 const size = 168;
@@ -37,7 +43,7 @@ const ticks = computed(() => {
 <template>
   <div class="ring-gauge" :style="{ width: `${size + 20}px`, height: `${size + 20}px` }">
     <svg :viewBox="`0 0 ${size} ${size}`" :width="size" :height="size" class="ring-svg">
-      <circle :cx="size / 2" :cy="size / 2" :r="r" fill="none" stroke="var(--border-soft-2)" :stroke-width="stroke" />
+      <circle :cx="size / 2" :cy="size / 2" :r="r" fill="none" :stroke="track" :stroke-width="stroke" />
       <circle
         :cx="size / 2" :cy="size / 2" :r="r" fill="none" :stroke="color" :stroke-width="stroke"
         :stroke-dasharray="`${dash} ${circumference}`"
@@ -46,7 +52,7 @@ const ticks = computed(() => {
       />
       <line v-for="(t, i) in ticks" :key="i" :x1="t.x1" :y1="t.y1" :x2="t.x2" :y2="t.y2" :class="['tick', { lit: t.lit }]" />
     </svg>
-    <div class="ring-center">
+    <div class="ring-center" :class="{ glow }" :style="glow ? { '--glow-color': color } : null">
       <span class="ring-value">{{ value }}</span>
       <span v-if="unit" class="ring-unit">{{ unit }}</span>
     </div>
@@ -82,6 +88,11 @@ const ticks = computed(() => {
   align-items: center;
   justify-content: center;
   gap: 1px;
+  border-radius: 50%;
+}
+
+.ring-center.glow {
+  background: radial-gradient(circle, color-mix(in srgb, var(--glow-color) 22%, transparent) 0%, transparent 72%);
 }
 
 .ring-value {

@@ -114,7 +114,7 @@ const dateTimeLabel = computed(() =>
 }
 
 .pill-link.router-link-exact-active {
-  background: var(--accent-grad);
+  background: var(--nav-active);
   color: #fff;
 }
 

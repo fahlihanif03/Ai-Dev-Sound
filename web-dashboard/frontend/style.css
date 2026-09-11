@@ -1,37 +1,42 @@
-/* Light theme - soft sage/cream surfaces, deep green + gold accent,
-   matching the SolarWind-style reference. Was a dark near-black/orange
-   theme; every component already reads these same var(--x) names (no
-   hardcoded colors), so this single swap reskins the whole app. */
+/* Light theme - blue-gray page background, white cards, single orange
+   accent, near-black nav/primary text, matching the SUING-style
+   reference. Every component reads these same var(--x) names (no
+   hardcoded colors), so this single swap reskins the whole app.
+   Status colors (amber/red/green - "Attention", "Offline", etc.) stay
+   their own distinct hues rather than folding into the single orange
+   accent - the reference's own "single accent" idea is about decorative
+   chart/gauge color, not about flattening alert semantics into ambiguity. */
 :root {
-  --page-bg: #eef1e7;
-  --bg: #fbf3da;
+  --page-bg: #b8c9d3;
+  --bg: transparent;
   --bg-glow: none;
   --surface: #ffffff;
   --surface-tint: #fffdf5;
-  --surface-2: #f4ecd4;
-  --border-soft: rgba(31, 46, 26, 0.08);
-  --border-soft-2: rgba(31, 46, 26, 0.14);
-  --text: #23301f;
-  --text-muted: #71806b;
-  --text-faint: #a3ac9a;
-  --accent: #2f6b3d;
-  --accent-2: #e0b53c;
-  --accent-soft: rgba(47, 107, 61, 0.12);
-  --accent-grad: linear-gradient(90deg, #2f6b3d, #e0b53c);
-  --accent-rgb: 47, 107, 61;
+  --surface-2: #eef1f3;
+  --border-soft: rgba(20, 24, 28, 0.08);
+  --border-soft-2: rgba(20, 24, 28, 0.14);
+  --text: #16181a;
+  --text-muted: #667085;
+  --text-faint: #9aa3ab;
+  --accent: #f5a623;
+  --accent-2: #ffcb6b;
+  --accent-soft: rgba(245, 166, 35, 0.14);
+  --accent-grad: linear-gradient(90deg, #f5a623, #ffcb6b);
+  --accent-rgb: 245, 166, 35;
+  --nav-active: #16181a;
   --amber: #c98a1f;
   --amber-soft: rgba(201, 138, 31, 0.16);
-  --red: #c8503f;
-  --red-soft: rgba(200, 80, 63, 0.14);
-  --green: #2f6b3d;
-  --green-soft: rgba(47, 107, 61, 0.12);
+  --red: #d9534f;
+  --red-soft: rgba(217, 83, 79, 0.14);
+  --green: #3fa66b;
+  --green-soft: rgba(63, 166, 107, 0.12);
   /* Kept dark on purpose - Predictive Maintenance's 3D PC model sits on
      this "stage" backdrop, and its lighting is tuned for a dark ground,
      so this pair stays dark even though the rest of the theme is light. */
   --stage: #0c0d0f;
   --stage-2: #1a1b1e;
-  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 36px rgba(35, 48, 31, 0.1);
-  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 14px rgba(35, 48, 31, 0.07);
+  --shadow: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 16px 36px rgba(20, 24, 28, 0.12);
+  --shadow-sm: 0 1px 0 rgba(255, 255, 255, 0.6) inset, 0 4px 14px rgba(20, 24, 28, 0.08);
   --radius-xl: 24px;
   --radius-lg: 18px;
   --radius-md: 12px;

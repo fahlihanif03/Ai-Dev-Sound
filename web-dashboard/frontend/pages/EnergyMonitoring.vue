@@ -55,7 +55,7 @@ function fmt(v) {
           <span class="eyebrow">Energy Monitoring</span>
           <span class="status-pill" :class="{ warn: !overallOk }">{{ overallOk ? "Normal" : "Attention" }}</span>
         </div>
-        <RingGauge :ratio="loadRatio" :value="`${loadPercent}%`" unit="Total load" color="var(--accent)" />
+        <RingGauge :ratio="loadRatio" :value="`${loadPercent}%`" unit="Total load" color="var(--accent)" track="rgba(255,255,255,0.25)" glow />
         <p class="hero-caption">Live status for the monitored circuit &mdash; {{ overallOk ? "everything's running normally." : "attention needed." }}</p>
       </div>
 
@@ -113,7 +113,7 @@ function fmt(v) {
               <span class="stat-value">{{ fmt(power.extra.current) }}<small>A</small></span>
             </div>
           </div>
-          <RingGauge :ratio="loadRatio" :value="loadPercent" unit="%" color="var(--accent)" />
+          <RingGauge :ratio="loadRatio" :value="loadPercent" unit="%" color="var(--accent)" track="#3a3f47" glow />
         </div>
       </div>
 
@@ -137,7 +137,7 @@ function fmt(v) {
               <span class="stat-value">{{ fmt(power.extra.current) }}<small>A</small></span>
             </div>
           </div>
-          <RingGauge :ratio="voltageRatio" :value="fmt(power.extra.voltage)" unit="V" color="var(--accent-2)" />
+          <RingGauge :ratio="voltageRatio" :value="fmt(power.extra.voltage)" unit="V" color="var(--accent)" track="#3a3f47" glow />
         </div>
       </div>
     </section>
@@ -166,9 +166,16 @@ function fmt(v) {
   align-items: stretch;
 }
 
+/* Deep charcoal-to-orange gradient, standing in for the reference's
+ * full-bleed product photo (no real photography of this demo kit exists
+ * to use here) - still gives the hero the same "rich, edge-to-edge
+ * visual, no white card chrome" treatment, just via gradient + rim-light
+ * glow instead of a photo. Text inside is light since it now sits on a
+ * dark ground, unlike the rest of the (light-themed) page. */
 .hero-panel {
-  background: linear-gradient(155deg, var(--accent-soft), rgba(224, 181, 60, 0.16));
-  border: 1px solid var(--border-soft);
+  background:
+    radial-gradient(circle at 82% 18%, rgba(245, 166, 35, 0.55), transparent 55%),
+    linear-gradient(155deg, #23262b, #15171a 70%);
   border-radius: var(--radius-xl);
   padding: 22px;
   display: flex;
@@ -176,6 +183,7 @@ function fmt(v) {
   align-items: center;
   gap: 12px;
   text-align: center;
+  color: #f4f1ec;
 }
 
 .hero-head {
@@ -209,7 +217,7 @@ function fmt(v) {
 }
 
 .hero-caption {
-  color: var(--text-muted);
+  color: rgba(244, 241, 236, 0.6);
   font-size: 13px;
   max-width: 260px;
 }
