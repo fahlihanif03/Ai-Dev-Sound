@@ -14,20 +14,25 @@ import type { Env } from "./env";
  * durability across DO restarts, and a full re-read from SQL only happens
  * once, in the constructor, to rehydrate memory after a cold start.
  *
- * Data source: simulated (see simulateTick()) so the dashboard is
- * demonstrably live end-to-end before/alongside the real board->cloud
- * bridge (see ../../bridge/). A real bridge POSTs to /api/ingest in the
- * same shape simulateTick() produces - see ingest() below. A channel that
- * received a real ingest in the last REAL_DATA_GRACE_MS stops being
- * simulated, so a bridge can come online one channel at a time.
+ * Data source: real board ingests only, via /api/ingest (see ingest()
+ * below) - a bridge (../../bridge/) or the firmware's own WiFi client
+ * POSTs a reading in the Reading shape. Used to fall back to a
+ * simulated signal generator for any channel that had never received a
+ * real ingest, so the dashboard looked alive before any board was
+ * connected - removed per explicit feedback that showing fake data
+ * (even clearly labeled as simulated, see Reading.real) wasn't wanted at
+ * all. A channel with no real data now just stays empty (value: null)
+ * until one actually arrives - see latestFor().
  */
 
 type Channel = "sound" | "temperature" | "power";
 
 interface Reading {
-  value: number;
+  // null before this channel has ever received a real ingest - see
+  // latestFor(). Never fabricated.
+  value: number | null;
   flag: "normal" | "abnormal";
-  threshold: number;
+  threshold: number | null;
   unit: string;
   extra?: Record<string, number>;
   /* True once a channel that has previously received a real ingest goes
@@ -46,31 +51,23 @@ interface Reading {
   real?: boolean;
 }
 
-const TICK_MS = 5000; // power cadence
-// 200ms turned out to be too aggressive for a Durable Object alarm in
-// practice - Miniflare threw "SQLite alarm handler canceled with
-// requestScheduledAlarm" + an uncaught internal error once the alarm was
-// being rescheduled every 200ms, risking the DO instance itself getting
-// torn down/restarted (which would have disrupted real board ingests too,
-// not just the simulator). 1s is still 5x faster than power and
-// comfortably clear of whatever internal minimum tripped that error - also
-// matches the firmware's own real send cadence for these two signals (see
-// wifi/telemetry.c's AUDIO_SEND_INTERVAL_MS/TEMP_SEND_INTERVAL_MS), so the
-// simulated and real-board experiences feel the same.
-const SOUND_TICK_MS = 1000;
-const TEMP_TICK_MS = 1000;
-const ALARM_RESOLUTION_MS = Math.min(TICK_MS, SOUND_TICK_MS, TEMP_TICK_MS); // how often the single alarm actually has to wake up to serve the fastest channel
+/* A Reading that's actually been measured - value/threshold narrowed to
+ * non-null. ingest()/recordAndBroadcast() only ever deal in these; the
+ * nullable Reading above exists solely to represent latestFor()'s
+ * synthetic "never received real data" placeholder. */
+type RealReading = Reading & { value: number; threshold: number };
+
+// Now the only thing the alarm exists for is noticing a real channel has
+// gone stale (see alarm()) - no simulation cadence to serve anymore, so
+// this just needs to be comfortably finer-grained than REAL_DATA_GRACE_MS
+// below, not tied to any signal's own sample rate.
+const ALARM_RESOLUTION_MS = 10_000;
 const IDLE_TICK_MS = 30_000; // alarm interval while no dashboard is connected - just checks back for reconnects
 // 1440 = 24h worth of real readings at the firmware's 1-reading/minute
 // cadence (see wifi/telemetry.c's AUDIO_SEND_INTERVAL_MS/
 // TEMP_SEND_INTERVAL_MS) - raised from 300 (5h) so the dashboard's "Last
 // 24 hours" range toggle (see AreaChart.vue) actually has 24h of real
-// data to show instead of silently truncating to whatever the cap
-// allowed. Note this is real-data-only math: the simulator (SOUND_TICK_MS/
-// TEMP_TICK_MS, used only when no board has ever sent real data for a
-// channel) still ticks once a second, so demo-mode history only spans
-// ~24 simulated minutes - a pre-existing simulator/real-cadence mismatch,
-// unrelated to this change.
+// data to show instead of silently truncating to whatever the cap allowed.
 const MAX_HISTORY_POINTS = 1440; // per channel, in memory
 // Must stay comfortably above the firmware's own send interval (60s, see
 // wifi/telemetry.c's AUDIO_SEND_INTERVAL_MS/TEMP_SEND_INTERVAL_MS) - a
@@ -82,16 +79,10 @@ const REAL_DATA_GRACE_MS = 150_000;
 const SQL_PRUNE_EVERY_N_WRITES = 300; // batches SQL cleanup instead of doing it every write
 
 const CHANNELS: Channel[] = ["sound", "temperature", "power"];
-const TICK_INTERVAL_MS: Record<Channel, number> = {
-  sound: SOUND_TICK_MS,
-  temperature: TEMP_TICK_MS,
-  power: TICK_MS,
-};
 
 export class DashboardState extends DurableObject<Env> {
   private lastRealIngestAt = new Map<Channel, number>();
-  private lastSimAt = new Map<Channel, number>(); // per-channel simulated-tick cadence, see TICK_INTERVAL_MS
-  private latestMem = new Map<Channel, Reading>();
+  private latestMem = new Map<Channel, RealReading>();
   private historyMem = new Map<Channel, { t: number; v: number }[]>();
   // Per-channel, not shared - a shared counter only prunes whichever
   // channel's write happens to trip it, leaving the other channels'
@@ -146,7 +137,7 @@ export class DashboardState extends DurableObject<Env> {
       }
 
       const alarm = await this.ctx.storage.getAlarm();
-      if (!alarm) await this.ctx.storage.setAlarm(Date.now() + TICK_MS);
+      if (!alarm) await this.ctx.storage.setAlarm(Date.now() + ALARM_RESOLUTION_MS);
     });
   }
 
@@ -177,7 +168,7 @@ export class DashboardState extends DurableObject<Env> {
   }
 
   /** Real bridge entry point - same shape/effect as a simulated tick. */
-  async ingest(channel: Channel, reading: Reading) {
+  async ingest(channel: Channel, reading: RealReading) {
     await this.ready;
     this.lastRealIngestAt.set(channel, Date.now());
     this.offlineAnnounced.delete(channel); // back online - re-arm the offline announcement for next time
@@ -187,44 +178,26 @@ export class DashboardState extends DurableObject<Env> {
   async alarm() {
     await this.ready;
 
-    // Nobody's watching - skip simulated writes entirely (they only exist
-    // to keep the dashboard visibly live) and just check back later in
-    // case someone (re)connects. Real board ingests still land immediately
-    // via ingest() regardless of this - this only affects the simulator.
-    // The DO's alarm previously ticked every TICK_MS forever, unconditionally,
-    // which was a real contributor to exhausting the Durable Object free
-    // tier's daily rows_read quota twice now (see docs/PROGRESS.md).
+    // Nobody's watching - no point checking for staleness transitions
+    // nobody will see, just check back later in case someone (re)connects.
+    // Real board ingests still land immediately via ingest() regardless.
     if (this.ctx.getWebSockets().length === 0) {
       await this.ctx.storage.setAlarm(Date.now() + IDLE_TICK_MS);
       return;
     }
 
-    // One alarm serving multiple cadences: it wakes up every
-    // ALARM_RESOLUTION_MS (the fastest channel's interval), but each
-    // channel only actually ticks once its own TICK_INTERVAL_MS has
-    // elapsed since its last tick - sound gets a fresh simulated point
-    // ~5x/sec, temperature/power stay at their slower TICK_MS cadence.
+    // Only job left: notice a channel that WAS real has gone quiet for
+    // too long, and announce it as offline (once) instead of just
+    // leaving its last real reading looking perpetually current.
+    // Channels that have never received a real ingest at all don't need
+    // anything here - latestFor() already reports them as empty on
+    // every read, nothing to transition.
     const now = Date.now();
     for (const channel of CHANNELS) {
-      const interval = TICK_INTERVAL_MS[channel];
-      const lastSim = this.lastSimAt.get(channel) ?? 0;
-      if (now - lastSim < interval) continue;
-      this.lastSimAt.set(channel, now);
-
       const lastReal = this.lastRealIngestAt.get(channel);
-      if (lastReal === undefined) {
-        // Never received a real ingest for this channel - keep the demo
-        // simulator running so a fresh dashboard doesn't look dead before
-        // any board/bridge has ever connected to it.
-        this.recordAndBroadcast(channel, simulateTick(channel));
-        continue;
-      }
+      if (lastReal === undefined) continue;
 
       if (now - lastReal > REAL_DATA_GRACE_MS) {
-        // Was real, now stale: show it as offline instead of quietly
-        // switching to fake data - silently simulating here used to make
-        // turning the real board off look identical to it still running,
-        // which defeats the point of watching a real board's status.
         if (!this.offlineAnnounced.has(channel)) {
           this.offlineAnnounced.add(channel);
           this.announceOffline(channel);
@@ -244,7 +217,7 @@ export class DashboardState extends DurableObject<Env> {
     return lastReal !== undefined && Date.now() - lastReal <= REAL_DATA_GRACE_MS;
   }
 
-  private recordAndBroadcast(channel: Channel, reading: Reading) {
+  private recordAndBroadcast(channel: Channel, reading: RealReading) {
     const t = Date.now();
 
     this.latestMem.set(channel, reading);
@@ -302,7 +275,7 @@ export class DashboardState extends DurableObject<Env> {
   private announceOffline(channel: Channel) {
     const last = this.latestMem.get(channel);
     if (!last) return; // nothing has ever been recorded for this channel - nothing to mark offline
-    const offlineReading: Reading = { ...last, offline: true };
+    const offlineReading: RealReading = { ...last, offline: true };
     this.latestMem.set(channel, offlineReading);
     const hist = this.historyMem.get(channel) ?? [];
     const payload = JSON.stringify({
@@ -333,12 +306,18 @@ export class DashboardState extends DurableObject<Env> {
   }
 
   private latestFor(channel: Channel): Reading & { history: { t: number; v: number }[] } {
-    const reading = this.latestMem.get(channel) ?? simulateTick(channel);
+    const reading = this.latestMem.get(channel);
+    const history = this.historyMem.get(channel) ?? [];
+    if (!reading) {
+      // Never received a real ingest for this channel - stay honestly
+      // empty rather than inventing a plausible-looking number.
+      return { value: null, flag: "normal", threshold: null, unit: "", extra: {}, offline: false, real: false, history };
+    }
     // real recomputed fresh here (not read off the stored reading) since
     // it can go stale between writes - e.g. a page loads and calls this
     // well after the last ingest, past REAL_DATA_GRACE_MS, without any
     // new broadcast having fired to update a stored flag.
-    return { ...reading, real: this.isReal(channel), history: this.historyMem.get(channel) ?? [] };
+    return { ...reading, real: this.isReal(channel), history };
   }
 
   private buildSnapshot() {
@@ -350,52 +329,3 @@ export class DashboardState extends DurableObject<Env> {
   }
 }
 
-/* --- Simulated signal generator ---
- * Plausible ranges/behavior per channel, with occasional anomaly bursts, so
- * the dashboard has something real to show before the UART->cloud bridge
- * exists. Replace by having a bridge POST to /api/ingest instead. */
-let soundBase = 0.3;
-let tempBase = 29.2;
-let powerBase = 2.4;
-
-function simulateTick(channel: Channel): Reading {
-  const jitter = (n: number) => (Math.random() - 0.5) * n;
-  const burst = Math.random() < 0.04; // occasional anomaly
-
-  if (channel === "sound") {
-    soundBase = clamp(soundBase + jitter(0.05), 0.1, 0.6);
-    const value = round(burst ? soundBase + 1.2 + Math.random() * 0.8 : soundBase, 3);
-    const threshold = 0.9324; // matches id_00_params.h's recalibrated threshold
-    return { value, flag: value > threshold ? "abnormal" : "normal", threshold, unit: "" };
-  }
-
-  if (channel === "temperature") {
-    tempBase = clamp(tempBase + jitter(0.15), 26, 33);
-    const value = round(burst ? tempBase + 6 + Math.random() * 4 : tempBase, 2);
-    const threshold = 50.0;
-    return { value, flag: value > threshold ? "abnormal" : "normal", threshold, unit: "C" };
-  }
-
-  // power
-  powerBase = clamp(powerBase + jitter(0.2), 1.2, 4.5);
-  const value = round(burst ? powerBase + 3 + Math.random() * 2 : powerBase, 2);
-  const threshold = 6.0;
-  const powerFactor = round(0.9 + Math.random() * 0.08, 2);
-  const voltage = round(228 + jitter(4), 1);
-  const current = round((value * 1000) / (voltage * powerFactor), 2);
-  return {
-    value,
-    flag: value > threshold ? "abnormal" : "normal",
-    threshold,
-    unit: "kW",
-    extra: { powerFactor, voltage, current },
-  };
-}
-
-function clamp(v: number, min: number, max: number) {
-  return Math.min(max, Math.max(min, v));
-}
-function round(v: number, dp: number) {
-  const f = 10 ** dp;
-  return Math.round(v * f) / f;
-}
